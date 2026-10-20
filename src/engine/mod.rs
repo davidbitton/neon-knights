@@ -5,6 +5,7 @@
 //! Nothing in here touches the browser, so all of it unit-tests natively.
 
 pub mod actor;
+pub mod font;
 pub mod gfx;
 pub mod palette;
 pub mod path;

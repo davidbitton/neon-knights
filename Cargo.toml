@@ -2,6 +2,7 @@
 name = "neon-knights"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.87"
 description = "Neon Knights: A Gentleman's Evening Out - an original parody adventure in the style of late-1980s parser adventures"
 license = "MIT"
 repository = "https://github.com/davidbitton/neon-knights"
@@ -18,8 +19,10 @@ js-sys = "0.3"
 web-sys = { version = "0.3", features = [
   "Window", "Document", "Element", "HtmlElement", "HtmlCanvasElement",
   "CanvasRenderingContext2d", "ImageData", "KeyboardEvent", "MouseEvent",
-  "WheelEvent", "Event", "EventTarget", "Storage", "DomRect", "Performance",
-  "TextMetrics", "console",
+  "Event", "EventTarget", "Storage", "DomRect", "console",
+  "AudioContext", "AudioContextState", "BaseAudioContext", "AudioNode",
+  "AudioParam", "AudioDestinationNode", "AudioScheduledSourceNode",
+  "OscillatorNode", "OscillatorType", "GainNode",
 ] }
 console_error_panic_hook = "0.1"
 

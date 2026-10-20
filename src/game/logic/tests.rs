@@ -45,7 +45,9 @@ fn unknown_words_get_snark() {
     let r = g.input("frobnicate the bartender");
     assert_eq!(r.messages.len(), 1);
     assert!(r.messages[0].contains("frobnicate"));
-    assert_eq!(r.effect, Effect::None);
+    assert_eq!(r.effect, Effect::Confused);
+    assert_eq!(g.input("jukebox").effect, Effect::Confused);
+    assert_eq!(g.input("look").effect, Effect::None);
 }
 
 #[test]
@@ -396,4 +398,23 @@ fn mid_game_save_round_trip_in_the_alley() {
     go(&mut h, Noun::Brenda);
     scored(&h.input("buy carnation"), 3);
     assert_eq!(h.state.score, g.state.score + 3);
+}
+
+#[test]
+fn sound_commands_work_anytime() {
+    let mut g = Game::new();
+    assert_eq!(g.input("sound off").effect, Effect::Sound(Some(false)));
+    assert_eq!(
+        g.input("Turn the sound ON").effect,
+        Effect::Sound(Some(true))
+    );
+    assert_eq!(g.input("mute").effect, Effect::Sound(Some(false)));
+    assert_eq!(g.input("unmute").effect, Effect::Sound(Some(true)));
+    assert_eq!(g.input("sound").effect, Effect::Sound(None));
+    let moves = g.state.moves;
+    g.state.dead = true;
+    assert_eq!(g.input("sound on").effect, Effect::Sound(Some(true)));
+    assert_eq!(g.state.moves, moves, "sound commands don't take a turn");
+    assert!(sound_command("sound the alarm").is_none());
+    assert!(sound_command("look").is_none());
 }

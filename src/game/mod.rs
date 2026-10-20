@@ -2,6 +2,7 @@
 
 pub mod logic;
 pub mod parser;
+pub mod sound;
 pub mod state;
 pub mod text;
 pub mod world;

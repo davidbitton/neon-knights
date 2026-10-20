@@ -39,6 +39,10 @@ pub enum Effect {
     Moved,
     /// The game has been won; show the ending screen.
     Won,
+    /// The parser didn't understand (the platform buzzes).
+    Confused,
+    /// Turn sound on (`Some(true)`), off, or toggle it (`None`).
+    Sound(Option<bool>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -98,7 +102,33 @@ pub(crate) fn near(s: &GameState, n: Noun) -> bool {
 
 pub const INTRO: &str = "Ocean Bluffs, 11:42 PM. The tide is out, the rent is due, and Chip Valentine has squeezed into his lucky powder-blue tuxedo for one perfect night on the town.\n\nHis first stop: The Rusty Anchor, a bar so dingy the cockroaches wipe their feet on the way OUT.";
 
-pub const HELP: &str = "Type commands like LOOK, LOOK AT BARTENDER, TAKE MATCHBOOK, TALK TO GUS, USE QUARTER ON JUKEBOX, GIVE HOT DOG TO MIME, BUY CARNATION, INVENTORY (or I), SCORE, SAVE, RESTORE, RESTART.\n\nArrow keys walk (press again to stop). Click to walk. Walk off a screen edge or into a doorway to go places, or type GO TO CASINO, ENTER STORE, LEAVE. Click a thing to use the current verb on it; right-click (or Tab) changes the verb.";
+pub const HELP: &str = "Type commands like LOOK, LOOK AT BARTENDER, TAKE MATCHBOOK, TALK TO GUS, USE QUARTER ON JUKEBOX, GIVE HOT DOG TO MIME, BUY CARNATION, INVENTORY (or I), SCORE, SAVE, RESTORE, RESTART, SOUND ON / SOUND OFF.\n\nArrow keys walk (press again to stop). Click to walk. Walk off a screen edge or into a doorway to go places, or type GO TO CASINO, ENTER STORE, LEAVE. Click a thing to use the current verb on it; right-click (or Tab) changes the verb. When you're not typing (title, message boxes, tombstones), M toggles sound.";
+
+pub const SOUND_ON: &str = "Sound on. Your PC speaker clears its throat and stands ready to beep.";
+pub const SOUND_OFF: &str = "Sound off. Silence is golden, like Chip's cufflinks. Well, gold-tone.";
+
+/// Recognize the sound commands, which work at any time (even when dead).
+pub fn sound_command(line: &str) -> Option<Option<bool>> {
+    let words: Vec<String> = line
+        .split_whitespace()
+        .map(|w| {
+            w.trim_matches(|c: char| !c.is_ascii_alphanumeric())
+                .to_ascii_lowercase()
+        })
+        .filter(|w| !w.is_empty() && w != "turn" && w != "the")
+        .collect();
+    let w: Vec<&str> = words.iter().map(String::as_str).collect();
+    match w.as_slice() {
+        ["sound" | "sounds" | "audio" | "beeps" | "music", "on"]
+        | ["on", "sound" | "sounds" | "audio" | "beeps" | "music"]
+        | ["unmute"] => Some(Some(true)),
+        ["sound" | "sounds" | "audio" | "beeps" | "music", "off"]
+        | ["off", "sound" | "sounds" | "audio" | "beeps" | "music"]
+        | ["mute"] => Some(Some(false)),
+        ["sound" | "sounds" | "audio"] | ["toggle", "sound" | "sounds" | "audio"] => Some(None),
+        _ => None,
+    }
+}
 
 pub const TOO_FAR: [&str; 3] = [
     "You'd have to get closer. Chip's arms are long, but not THAT long.",
@@ -258,6 +288,9 @@ impl Game {
 
     /// Handle one typed line.
     pub fn input(&mut self, line: &str) -> Reply {
+        if let Some(on) = sound_command(line) {
+            return Reply::effect(Effect::Sound(on));
+        }
         if self.state.dead {
             return Reply::say("You're dead. It's a whole thing. Restore, restart, or quit.");
         }
@@ -276,12 +309,13 @@ impl Game {
             Err(ParseError::UnknownWord(w)) => {
                 let tmpl = pick(&UNKNOWN_WORD, self.state.moves + w.len() as u32);
                 self.state.moves += 1;
-                Reply::say(tmpl.replace("{}", &w))
+                Reply::say(tmpl.replace("{}", &w)).with(Effect::Confused)
             }
             Err(ParseError::NoVerb(n)) => Reply::say(format!(
                 "What about the {}? Start with a verb, like a gentleman: LOOK, TAKE, TALK, USE...",
                 world::noun_word(n)
-            )),
+            ))
+            .with(Effect::Confused),
         }
     }
 
