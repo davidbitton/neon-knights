@@ -76,22 +76,78 @@ pub enum ParseError {
 
 /// Words that are silently skipped.
 pub const FILLER: &[&str] = &[
-    "the", "a", "an", "at", "to", "with", "on", "in", "into", "inside", "up", "down", "my", "your",
-    "some", "please", "around", "of", "for", "from", "that", "this", "it", "him", "her", "about",
-    "and", "then", "out", "over", "over", "under", "behind", "can", "i'd", "id", "like", "would",
-    "lets", "let's", "game", "quickly", "slowly", "carefully", "again", "one", "another", "here",
-    "there", "now", "just", "all", "is", "am", "are", "be", "using", "by", "off",
+    "the",
+    "a",
+    "an",
+    "at",
+    "to",
+    "with",
+    "on",
+    "in",
+    "into",
+    "inside",
+    "up",
+    "down",
+    "my",
+    "your",
+    "some",
+    "please",
+    "around",
+    "of",
+    "for",
+    "from",
+    "that",
+    "this",
+    "it",
+    "him",
+    "her",
+    "about",
+    "and",
+    "then",
+    "out",
+    "over",
+    "over",
+    "under",
+    "behind",
+    "can",
+    "i'd",
+    "id",
+    "like",
+    "would",
+    "lets",
+    "let's",
+    "game",
+    "quickly",
+    "slowly",
+    "carefully",
+    "again",
+    "one",
+    "another",
+    "here",
+    "there",
+    "now",
+    "just",
+    "all",
+    "is",
+    "am",
+    "are",
+    "be",
+    "using",
+    "by",
+    "off",
 ];
 
 pub fn verb_for(word: &str) -> Option<Verb> {
     use Verb::*;
     Some(match word {
-        "look" | "l" | "examine" | "x" | "inspect" | "check" | "view" | "see" | "watch" | "observe"
-        | "describe" | "ogle" => Look,
+        "look" | "l" | "examine" | "x" | "inspect" | "check" | "view" | "see" | "watch"
+        | "observe" | "describe" | "ogle" => Look,
         "read" => Read,
         "take" | "get" | "grab" | "pick" | "steal" | "pocket" | "snag" | "nab" => Take,
         "drop" | "discard" | "toss" => Drop,
-        "talk" | "speak" | "chat" | "ask" | "greet" | "hello" | "hi" | "hey" | "say" | "tell" => Talk,
+        "talk" | "speak" | "chat" | "ask" | "greet" | "hello" | "hi" | "hey" | "say" | "tell" => {
+            Talk
+        }
         "use" | "insert" | "put" | "push" | "press" => Use,
         "open" | "unlock" | "enter" => Open,
         "close" | "shut" => Close,
@@ -126,15 +182,19 @@ pub fn noun_for(word: &str) -> Option<Noun> {
         "quarter" | "coin" | "money" | "change" | "cash" | "25" => Quarter,
         "comb" | "hair" | "pompadour" => Comb,
         "egg" | "eggs" | "jar" | "pickled" => Egg,
-        "drink" | "drinks" | "beer" | "booze" | "cocktail" | "special" | "bilge" | "water" | "glass"
-        | "liquor" => Drink,
+        "drink" | "drinks" | "beer" | "booze" | "cocktail" | "special" | "bilge" | "water"
+        | "glass" | "liquor" => Drink,
         "bar" | "counter" | "bartop" => Bar,
         "stool" | "stools" | "seat" | "barstool" => Stool,
         "door" | "street" | "outside" | "boardwalk" => Door,
-        "restroom" | "bathroom" | "toilet" | "loo" | "wc" | "lavatory" | "mens" | "john" => Restroom,
+        "restroom" | "bathroom" | "toilet" | "loo" | "wc" | "lavatory" | "mens" | "john" => {
+            Restroom
+        }
         "sign" | "neon" | "light" | "lights" => Sign,
         "bottles" | "bottle" | "shelf" | "shelves" | "mirror" => Bottles,
-        "patron" | "drunk" | "regular" | "sailor" | "barfly" | "captain" | "customer" | "hat" => Patron,
+        "patron" | "drunk" | "regular" | "sailor" | "barfly" | "captain" | "customer" | "hat" => {
+            Patron
+        }
         "table" => Table,
         "floor" | "puddle" | "ground" => Floor,
         "me" | "self" | "myself" | "chip" | "tux" | "tuxedo" | "suit" | "clothes" => Me,
@@ -204,7 +264,10 @@ mod tests {
     use super::*;
 
     fn cmd(v: Verb, n: &[Noun]) -> Result<Command, ParseError> {
-        Ok(Command { verb: v, nouns: n.to_vec() })
+        Ok(Command {
+            verb: v,
+            nouns: n.to_vec(),
+        })
     }
 
     #[test]
@@ -226,15 +289,24 @@ mod tests {
 
     #[test]
     fn filler_words_are_ignored() {
-        assert_eq!(parse("look at the bartender"), cmd(Verb::Look, &[Noun::Bartender]));
-        assert_eq!(parse("please pick up the matchbook"), cmd(Verb::Take, &[Noun::Matchbook]));
+        assert_eq!(
+            parse("look at the bartender"),
+            cmd(Verb::Look, &[Noun::Bartender])
+        );
+        assert_eq!(
+            parse("please pick up the matchbook"),
+            cmd(Verb::Take, &[Noun::Matchbook])
+        );
         assert_eq!(parse("talk to gus"), cmd(Verb::Talk, &[Noun::Bartender]));
         assert_eq!(parse("look around"), cmd(Verb::Look, &[]));
     }
 
     #[test]
     fn case_and_punctuation() {
-        assert_eq!(parse("  LOOK   At THE Bartender!!"), cmd(Verb::Look, &[Noun::Bartender]));
+        assert_eq!(
+            parse("  LOOK   At THE Bartender!!"),
+            cmd(Verb::Look, &[Noun::Bartender])
+        );
         assert_eq!(parse("look, gus."), cmd(Verb::Look, &[Noun::Bartender]));
     }
 
@@ -248,7 +320,10 @@ mod tests {
             parse("put coin in juke box"),
             cmd(Verb::Use, &[Noun::Quarter, Noun::Jukebox])
         );
-        assert_eq!(parse("ask gus about the special"), cmd(Verb::Talk, &[Noun::Bartender, Noun::Drink]));
+        assert_eq!(
+            parse("ask gus about the special"),
+            cmd(Verb::Talk, &[Noun::Bartender, Noun::Drink])
+        );
     }
 
     #[test]
@@ -265,7 +340,10 @@ mod tests {
         assert_eq!(parse("   "), Err(ParseError::Empty));
         assert_eq!(parse("the the"), Err(ParseError::Empty));
         assert_eq!(parse("xyzzy"), Err(ParseError::UnknownWord("xyzzy".into())));
-        assert_eq!(parse("look at xyzzy"), Err(ParseError::UnknownWord("xyzzy".into())));
+        assert_eq!(
+            parse("look at xyzzy"),
+            Err(ParseError::UnknownWord("xyzzy".into()))
+        );
         assert_eq!(parse("bartender"), Err(ParseError::NoVerb(Noun::Bartender)));
     }
 }

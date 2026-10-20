@@ -45,7 +45,11 @@ impl Sprite {
     }
 
     pub fn blank(w: i32, h: i32) -> Sprite {
-        Sprite { w, h, px: vec![None; (w * h) as usize] }
+        Sprite {
+            w,
+            h,
+            px: vec![None; (w * h) as usize],
+        }
     }
 
     pub fn get(&self, x: i32, y: i32) -> Option<u8> {
@@ -261,7 +265,7 @@ const GUS: [&str; 22] = [
 pub fn gus_frame(frame: u8) -> Sprite {
     let mut s = Sprite::from_rows(&GUS);
     // Hands + glass move between two positions.
-    let gx = if frame % 2 == 0 { 4 } else { 8 };
+    let gx = if frame.is_multiple_of(2) { 4 } else { 8 };
     for y in 13..16 {
         s.set(gx, y, Some(LIGHT_GRAY));
         s.set(gx + 1, y, Some(WHITE));
@@ -284,7 +288,9 @@ mod tests {
                 let s = hero_frame(dir, f);
                 assert_eq!((s.w, s.h), (HERO_W, HERO_H));
                 // There's a shoe somewhere in the last two rows.
-                let feet = (0..s.w).any(|x| s.get(x, HERO_H - 1) == Some(BLACK) || s.get(x, HERO_H - 2) == Some(BLACK));
+                let feet = (0..s.w).any(|x| {
+                    s.get(x, HERO_H - 1) == Some(BLACK) || s.get(x, HERO_H - 2) == Some(BLACK)
+                });
                 assert!(feet, "{dir:?} frame {f} has no feet");
             }
         }

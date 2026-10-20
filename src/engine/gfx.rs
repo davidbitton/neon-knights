@@ -26,7 +26,10 @@ pub struct Pen {
 
 impl Pen {
     pub fn color(c: u8) -> Self {
-        Pen { visual: Some(c), ..Default::default() }
+        Pen {
+            visual: Some(c),
+            ..Default::default()
+        }
     }
     pub fn pri(mut self, p: u8) -> Self {
         self.priority = Some(p);
@@ -37,10 +40,16 @@ impl Pen {
         self
     }
     pub fn priority_only(p: u8) -> Self {
-        Pen { priority: Some(p), ..Default::default() }
+        Pen {
+            priority: Some(p),
+            ..Default::default()
+        }
     }
     pub fn control_only(c: u8) -> Self {
-        Pen { control: Some(c), ..Default::default() }
+        Pen {
+            control: Some(c),
+            ..Default::default()
+        }
     }
 }
 
@@ -104,7 +113,9 @@ impl Picture {
         Self::idx(x, y).map(|i| self.priority[i])
     }
     pub fn control_at(&self, x: i32, y: i32) -> u8 {
-        Self::idx(x, y).map(|i| self.control[i]).unwrap_or(CTRL_BLOCK)
+        Self::idx(x, y)
+            .map(|i| self.control[i])
+            .unwrap_or(CTRL_BLOCK)
     }
     pub fn walkable(&self, x: i32, y: i32) -> bool {
         self.control_at(x, y) == CTRL_WALK
@@ -166,7 +177,12 @@ impl Picture {
             return;
         }
         let min_y = pts.iter().map(|p| p.1).min().unwrap().max(0);
-        let max_y = pts.iter().map(|p| p.1).max().unwrap().min(HEIGHT as i32 - 1);
+        let max_y = pts
+            .iter()
+            .map(|p| p.1)
+            .max()
+            .unwrap()
+            .min(HEIGHT as i32 - 1);
         let n = pts.len();
         let mut xs: Vec<i32> = Vec::with_capacity(8);
         for y in min_y..=max_y {
@@ -200,7 +216,10 @@ impl Picture {
         let pts: Vec<(i32, i32)> = (0..24)
             .map(|i| {
                 let a = i as f32 / 24.0 * std::f32::consts::TAU;
-                (cx + (a.cos() * rx as f32).round() as i32, cy + (a.sin() * ry as f32).round() as i32)
+                (
+                    cx + (a.cos() * rx as f32).round() as i32,
+                    cy + (a.sin() * ry as f32).round() as i32,
+                )
             })
             .collect();
         self.fill_polygon(&pts, pen);
@@ -231,7 +250,14 @@ impl Picture {
         }
     }
 
-    fn flood_inner(&mut self, x: i32, y: i32, target: u8, pen: Pen, mut seen: Option<&mut Vec<bool>>) {
+    fn flood_inner(
+        &mut self,
+        x: i32,
+        y: i32,
+        target: u8,
+        pen: Pen,
+        mut seen: Option<&mut Vec<bool>>,
+    ) {
         let mut stack = vec![(x, y)];
         while let Some((cx, cy)) = stack.pop() {
             let Some(i) = Self::idx(cx, cy) else { continue };
@@ -266,7 +292,9 @@ impl Default for Frame {
 
 impl Frame {
     pub fn new() -> Self {
-        Frame { pixels: vec![0; WIDTH * HEIGHT] }
+        Frame {
+            pixels: vec![0; WIDTH * HEIGHT],
+        }
     }
 
     pub fn copy_from(&mut self, pic: &Picture) {
@@ -336,7 +364,10 @@ mod tests {
     #[test]
     fn polygon_fill_covers_interior_only() {
         let mut p = Picture::new();
-        p.fill_polygon(&[(10, 10), (30, 10), (30, 30), (10, 30)], Pen::color(2).pri(5));
+        p.fill_polygon(
+            &[(10, 10), (30, 10), (30, 30), (10, 30)],
+            Pen::color(2).pri(5),
+        );
         assert_eq!(p.visual_at(20, 20), Some(2));
         assert_eq!(p.priority_at(20, 20), Some(5));
         assert_eq!(p.visual_at(9, 20), Some(0));

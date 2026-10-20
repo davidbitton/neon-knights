@@ -31,13 +31,22 @@ pub struct Reply {
 
 impl Reply {
     fn say(s: impl Into<String>) -> Reply {
-        Reply { messages: vec![s.into()], effect: Effect::None }
+        Reply {
+            messages: vec![s.into()],
+            effect: Effect::None,
+        }
     }
     fn many(v: Vec<String>) -> Reply {
-        Reply { messages: v, effect: Effect::None }
+        Reply {
+            messages: v,
+            effect: Effect::None,
+        }
     }
     fn effect(effect: Effect) -> Reply {
-        Reply { messages: vec![], effect }
+        Reply {
+            messages: vec![],
+            effect,
+        }
     }
     fn with(mut self, effect: Effect) -> Reply {
         self.effect = effect;
@@ -94,7 +103,9 @@ fn scored(mut r: Reply, pts: u32) -> Reply {
 
 impl Game {
     pub fn new() -> Game {
-        Game { state: GameState::new() }
+        Game {
+            state: GameState::new(),
+        }
     }
 
     pub fn score_line(&self) -> String {
@@ -318,7 +329,9 @@ impl Game {
 
     fn talk_gus(&mut self, about_special: bool) -> Reply {
         if !is_near(&self.state, Noun::Bartender) {
-            return Reply::say("Gus can't hear you over the ice machine's death rattle. Step up to the bar.");
+            return Reply::say(
+                "Gus can't hear you over the ice machine's death rattle. Step up to the bar.",
+            );
         }
         if about_special || self.state.flag(Flag::ReadMatchbook) {
             return self.order_drink();
@@ -338,7 +351,9 @@ impl Game {
         }
         let s = &mut self.state;
         if s.flag(Flag::GotDrink) {
-            return Reply::say("Gus: \"One Special per customer. Doctor's orders. Several doctors, actually.\"");
+            return Reply::say(
+                "Gus: \"One Special per customer. Doctor's orders. Several doctors, actually.\"",
+            );
         }
         if !s.flag(Flag::ReadMatchbook) {
             return Reply::say("Gus: \"Beer's two bucks.\" You have a lucky quarter and a comb. Gus does not accept combs.");
@@ -372,7 +387,9 @@ impl Game {
                 return if self.state.flag(Flag::PlayedJukebox) {
                     Reply::say("The jukebox is already playing. You've spent your fortune, all twenty-five cents of it.")
                 } else {
-                    Reply::say("The jukebox wants a quarter. You've got nothing but good intentions.")
+                    Reply::say(
+                        "The jukebox wants a quarter. You've got nothing but good intentions.",
+                    )
                 };
             }
             if !is_near(&self.state, N::Jukebox) {
@@ -504,7 +521,10 @@ mod tests {
         assert_eq!(g.input("use quarter on jukebox").effect, Effect::Scored(5));
         assert!(!g.state.has(Item::Quarter));
         go(&mut g, Noun::Bartender);
-        assert_eq!(g.input("ask gus about the special").effect, Effect::Scored(5));
+        assert_eq!(
+            g.input("ask gus about the special").effect,
+            Effect::Scored(5)
+        );
         assert!(g.state.has(Item::Drink));
         assert_eq!(g.input("drink it").effect, Effect::Scored(2));
         assert_eq!(g.state.score, MAX_SCORE);

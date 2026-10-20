@@ -16,7 +16,11 @@ pub fn wrap(text: &str, width: usize) -> Vec<String> {
                 word = word.chars().skip(width).collect();
                 out.push(head);
             }
-            let need = if line.is_empty() { word.len() } else { line.len() + 1 + word.len() };
+            let need = if line.is_empty() {
+                word.len()
+            } else {
+                line.len() + 1 + word.len()
+            };
             if need > width && !line.is_empty() {
                 out.push(std::mem::take(&mut line));
             }

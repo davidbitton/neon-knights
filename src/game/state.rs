@@ -156,7 +156,9 @@ impl GameState {
             return Err(LoadError::Malformed("field count"));
         }
         let num = |i: usize, what: &'static str| -> Result<i64, LoadError> {
-            parts[i].parse::<i64>().map_err(|_| LoadError::Malformed(what))
+            parts[i]
+                .parse::<i64>()
+                .map_err(|_| LoadError::Malformed(what))
         };
         let mut inventory = Vec::new();
         for c in parts[3].chars() {
@@ -207,7 +209,13 @@ mod tests {
         let mut s = GameState::new();
         s.add(Item::Matchbook);
         s.add(Item::Matchbook);
-        assert_eq!(s.inventory.iter().filter(|i| **i == Item::Matchbook).count(), 1);
+        assert_eq!(
+            s.inventory
+                .iter()
+                .filter(|i| **i == Item::Matchbook)
+                .count(),
+            1
+        );
         assert!(s.remove(Item::Quarter));
         assert!(!s.remove(Item::Quarter));
     }

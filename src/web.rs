@@ -7,7 +7,10 @@ use std::rc::Rc;
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::{Clamped, JsCast};
-use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, ImageData, KeyboardEvent, MouseEvent, Storage, Window};
+use web_sys::{
+    CanvasRenderingContext2d, HtmlCanvasElement, ImageData, KeyboardEvent, MouseEvent, Storage,
+    Window,
+};
 
 use crate::engine::actor::Actor;
 use crate::engine::gfx::{priority_for_y, Frame, Picture, HEIGHT, WIDTH};
@@ -37,10 +40,20 @@ enum Mode {
 }
 
 /// Click verbs (right-click / Tab cycles them).
-const VERBS: [(&str, &str); 5] = [("Walk", ""), ("Look", "look"), ("Take", "take"), ("Talk", "talk to"), ("Use", "use")];
+const VERBS: [(&str, &str); 5] = [
+    ("Walk", ""),
+    ("Look", "look"),
+    ("Take", "take"),
+    ("Talk", "talk to"),
+    ("Use", "use"),
+];
 
-const BUTTONS: [(&str, i32, i32); 3] = [("Restore [R]", 122, 186), ("Restart [N]", 189, 253), ("Quit [Q]", 256, 314)];
-const BUTTON_Y: (i32, i32) = (140, 158);
+const BUTTONS: [(&str, i32, i32); 3] = [
+    ("Restore", 126, 188),
+    ("Restart", 190, 252),
+    ("Quit", 254, 316),
+];
+const BUTTON_Y: (i32, i32) = (152, 170);
 
 struct App {
     mode: Mode,
@@ -66,6 +79,8 @@ struct App {
     hi: CanvasRenderingContext2d,
     hi_canvas: HtmlCanvasElement,
     font: String,
+    /// Horizontal offset that centers a glyph in its text cell (display px).
+    glyph_dx: f64,
 }
 
 fn window() -> Window {
@@ -92,20 +107,26 @@ fn z_sprite() -> Sprite {
 }
 
 impl App {
-    fn new(lo: CanvasRenderingContext2d, hi: CanvasRenderingContext2d, hi_canvas: HtmlCanvasElement) -> App {
+    fn new(
+        lo: CanvasRenderingContext2d,
+        hi: CanvasRenderingContext2d,
+        hi_canvas: HtmlCanvasElement,
+    ) -> App {
         let game = Game::new();
         let bar_pic = scene::draw_bar(&game.state);
         let bar_flags = game.state.flags;
         // Pick the largest monospace size whose glyphs fit our text cell.
         let mut font = String::new();
-        for px in (12..=28).rev() {
+        let mut glyph_w = 0.0;
+        for px in (12..=25).rev() {
             font = format!("bold {px}px 'DejaVu Sans Mono', 'Courier New', monospace");
             hi.set_font(&font);
-            let w = hi.measure_text("M").map(|m| m.width()).unwrap_or(99.0);
-            if w <= CW as f64 * SCALE {
+            glyph_w = hi.measure_text("M").map(|m| m.width()).unwrap_or(99.0);
+            if glyph_w <= CW as f64 * SCALE - 1.0 {
                 break;
             }
         }
+        let glyph_dx = ((CW as f64 * SCALE - glyph_w) / 2.0).max(0.0);
         App {
             mode: Mode::Title,
             hero: Actor::new(START_POS.0, START_POS.1),
@@ -130,6 +151,7 @@ impl App {
             hi,
             hi_canvas,
             font,
+            glyph_dx,
         }
     }
 
@@ -151,7 +173,9 @@ impl App {
     fn save(&mut self) {
         self.game.state.hero = (self.hero.x, self.hero.y);
         let data = self.game.state.serialize();
-        let ok = storage().map(|s| s.set_item(SAVE_KEY, &data).is_ok()).unwrap_or(false);
+        let ok = storage()
+            .map(|s| s.set_item(SAVE_KEY, &data).is_ok())
+            .unwrap_or(false);
         self.queue.push_back(if ok {
             "Game saved. Your progress is safe, which is more than can be said for your liver.".into()
         } else {
@@ -169,6 +193,8 @@ impl App {
                 self.death = None;
                 self.death_pending = false;
                 self.pending = None;
+                self.last_cmd = None;
+                self.input.clear();
                 self.queue.clear();
                 self.queue.push_back("Game restored. Previously, on Neon Nights...".into());
             }
@@ -330,7 +356,11 @@ impl App {
                     return;
                 }
                 self.game.state.hero = (self.hero.x, self.hero.y);
-                let hot = if self.verb == 0 { None } else { scene::hotspot_at(&self.game.state, x, y) };
+                let hot = if self.verb == 0 {
+                    None
+                } else {
+                    scene::hotspot_at(&self.game.state, x, y)
+                };
                 match hot {
                     Some(h) => {
                         let (_, word) = VERBS[self.verb];
@@ -391,7 +421,12 @@ impl App {
     }
 
     fn box_rect(lines: &[String], area: (i32, i32, i32, i32)) -> (i32, i32, i32, i32) {
-        let cols = lines.iter().map(|l| l.chars().count()).max().unwrap_or(1).max(10) as i32;
+        let cols = lines
+            .iter()
+            .map(|l| l.chars().count())
+            .max()
+            .unwrap_or(1)
+            .max(10) as i32;
         let w = cols * CW + 18;
         let h = lines.len() as i32 * LH + 14;
         let (ax0, ay0, ax1, ay1) = area;
@@ -421,9 +456,25 @@ impl App {
             if zr < 30 {
                 z_sprite().blit(f, 292 + zr / 6, 104 - zr / 2);
             }
-            gus_frame((self.ticks / 12 % 2) as u8).blit_priority(f, &self.bar_pic, scene::GUS_POS.0, scene::GUS_POS.1, priority_for_y(scene::GUS_POS.1));
-            let hf = if self.hero.is_moving() { self.hero.frame } else { 0 };
-            hero_frame(self.hero.dir, hf).blit_priority(f, &self.bar_pic, self.hero.x, self.hero.y, priority_for_y(self.hero.y));
+            gus_frame((self.ticks / 12 % 2) as u8).blit_priority(
+                f,
+                &self.bar_pic,
+                scene::GUS_POS.0,
+                scene::GUS_POS.1,
+                priority_for_y(scene::GUS_POS.1),
+            );
+            let hf = if self.hero.is_moving() {
+                self.hero.frame
+            } else {
+                0
+            };
+            hero_frame(self.hero.dir, hf).blit_priority(
+                f,
+                &self.bar_pic,
+                self.hero.x,
+                self.hero.y,
+                priority_for_y(self.hero.y),
+            );
         }
         if matches!(self.mode, Mode::Playing | Mode::Dead) {
             f.fill_rect(0, 0, WIDTH as i32, STATUS_H, WHITE);
@@ -431,7 +482,10 @@ impl App {
         }
         if self.mode == Mode::Dead {
             if let Some(d) = &self.death {
-                let lines: Vec<String> = std::iter::once(d.cause.to_uppercase()).chain(std::iter::once(String::new())).chain(d.epitaph.iter().map(|s| s.to_string())).collect();
+                let lines: Vec<String> = std::iter::once(d.cause.to_uppercase())
+                    .chain(std::iter::once(String::new()))
+                    .chain(d.epitaph.iter().map(|s| s.to_string()))
+                    .collect();
                 let (x0, y0, x1, y1) = Self::box_rect(&lines, (120, 14, 316, 136));
                 f.message_box(x0, y0, x1, y1, WHITE, RED);
             }
@@ -445,15 +499,30 @@ impl App {
         }
     }
 
+    /// Draw text on the fixed character grid (CW framebuffer pixels per
+    /// glyph), like a text-mode interpreter would.
     fn text(&self, s: &str, x: i32, y: i32, color: u8) {
         self.hi.set_fill_style_str(&palette::css(color));
-        let _ = self.hi.fill_text(s, x as f64 * SCALE, y as f64 * SCALE + 2.0);
+        let mut buf = [0u8; 4];
+        for (i, ch) in s.chars().enumerate() {
+            if ch == ' ' {
+                continue;
+            }
+            let px = (x + i as i32 * CW) as f64 * SCALE + self.glyph_dx;
+            let _ = self
+                .hi
+                .fill_text(ch.encode_utf8(&mut buf), px, y as f64 * SCALE + 2.0);
+        }
     }
 
     fn render(&mut self) -> Result<(), JsValue> {
         self.compose();
         self.frame.to_rgba(&mut self.rgba);
-        let img = ImageData::new_with_u8_clamped_array_and_sh(Clamped(&self.rgba), WIDTH as u32, HEIGHT as u32)?;
+        let img = ImageData::new_with_u8_clamped_array_and_sh(
+            Clamped(&self.rgba),
+            WIDTH as u32,
+            HEIGHT as u32,
+        )?;
         self.lo.put_image_data(&img, 0.0, 0.0)?;
 
         let hi = &self.hi;
@@ -461,7 +530,7 @@ impl App {
         hi.set_text_baseline("top");
         hi.set_font(&self.font);
         hi.set_shadow_blur(0.0);
-        let blink = (self.ticks / 8) % 2 == 0;
+        let blink = (self.ticks / 8).is_multiple_of(2);
 
         match self.mode {
             Mode::Title => {
@@ -492,7 +561,11 @@ impl App {
                 hi.set_fill_style_str(&palette::css(LIGHT_MAGENTA));
                 hi.fill_text("Thanks for playing Neon Nights!", 480.0, 220.0)?;
                 hi.set_fill_style_str(&palette::css(WHITE));
-                hi.fill_text("Chip will be at the Rusty Anchor. He's always at the Rusty Anchor.", 480.0, 270.0)?;
+                hi.fill_text(
+                    "Chip will be at the Rusty Anchor. He's always there.",
+                    480.0,
+                    270.0,
+                )?;
                 hi.set_fill_style_str(&palette::css(YELLOW));
                 hi.fill_text("Press ENTER to return to the title screen.", 480.0, 340.0)?;
                 hi.set_text_align("left");
@@ -500,23 +573,50 @@ impl App {
             Mode::Playing | Mode::Dead => {
                 let score = self.game.score_line();
                 self.text(&score, 2, 0, BLACK);
-                let place = if self.mode == Mode::Dead { "Deceased" } else { "The Rusty Anchor" };
+                let place = if self.mode == Mode::Dead {
+                    "Deceased"
+                } else {
+                    "The Rusty Anchor"
+                };
                 self.text(place, WIDTH as i32 - 2 - place.len() as i32 * CW, 0, BLACK);
                 if self.mode == Mode::Playing {
                     let (line, col) = if !self.input.is_empty() || self.last_cmd.is_none() {
-                        (format!(">{}{}", self.input, if blink { "_" } else { "" }), WHITE)
+                        (
+                            format!(">{}{}", self.input, if blink { "_" } else { "" }),
+                            WHITE,
+                        )
                     } else {
-                        (format!(">{}", self.last_cmd.as_deref().unwrap_or("")), LIGHT_GRAY)
+                        (
+                            format!(">{}", self.last_cmd.as_deref().unwrap_or("")),
+                            LIGHT_GRAY,
+                        )
                     };
                     self.text(&line, 2, PIC_BOTTOM + 3, col);
-                    let hint = format!("Click verb: {}   (right-click/Tab to change, F1 help)", VERBS[self.verb].0);
+                    let hint = format!(
+                        "Verb:[{}]  Right-click/Tab: change verb  F1: help",
+                        VERBS[self.verb].0
+                    );
                     self.text(&hint, 2, PIC_BOTTOM + 13, CYAN);
                 } else {
-                    self.text("You have died. Choose wisely; it's a first for you.", 2, PIC_BOTTOM + 7, LIGHT_GRAY);
+                    self.text(
+                        "Keys:  R = Restore   N = Restart   Q = Quit",
+                        2,
+                        PIC_BOTTOM + 3,
+                        LIGHT_GRAY,
+                    );
+                    self.text(
+                        "Choose wisely. It would be a first.",
+                        2,
+                        PIC_BOTTOM + 13,
+                        CYAN,
+                    );
                 }
                 if self.mode == Mode::Dead {
                     if let Some(d) = &self.death {
-                        let lines: Vec<String> = std::iter::once(d.cause.to_uppercase()).chain(std::iter::once(String::new())).chain(d.epitaph.iter().map(|s| s.to_string())).collect();
+                        let lines: Vec<String> = std::iter::once(d.cause.to_uppercase())
+                            .chain(std::iter::once(String::new()))
+                            .chain(d.epitaph.iter().map(|s| s.to_string()))
+                            .collect();
                         let (x0, y0, x1, _) = Self::box_rect(&lines, (120, 14, 316, 136));
                         for (i, l) in lines.iter().enumerate() {
                             let w = l.chars().count() as i32 * CW;
@@ -530,7 +630,8 @@ impl App {
                     }
                 }
                 if let Some(lines) = self.message_lines() {
-                    let (x0, y0, _, _) = Self::box_rect(&lines, (0, STATUS_H, WIDTH as i32, PIC_BOTTOM));
+                    let (x0, y0, _, _) =
+                        Self::box_rect(&lines, (0, STATUS_H, WIDTH as i32, PIC_BOTTOM));
                     for (i, l) in lines.iter().enumerate() {
                         self.text(l, x0 + 9, y0 + 7 + i as i32 * LH, BLACK);
                     }
@@ -541,12 +642,20 @@ impl App {
     }
 }
 
+type FrameCallback = Closure<dyn FnMut(f64)>;
+
 #[wasm_bindgen(start)]
 pub fn start() -> Result<(), JsValue> {
     console_error_panic_hook::set_once();
     let doc = window().document().ok_or("no document")?;
-    let lo_canvas: HtmlCanvasElement = doc.get_element_by_id("lo").ok_or("missing #lo")?.dyn_into()?;
-    let hi_canvas: HtmlCanvasElement = doc.get_element_by_id("hi").ok_or("missing #hi")?.dyn_into()?;
+    let lo_canvas: HtmlCanvasElement = doc
+        .get_element_by_id("lo")
+        .ok_or("missing #lo")?
+        .dyn_into()?;
+    let hi_canvas: HtmlCanvasElement = doc
+        .get_element_by_id("hi")
+        .ok_or("missing #hi")?
+        .dyn_into()?;
     lo_canvas.set_width(WIDTH as u32);
     lo_canvas.set_height(HEIGHT as u32);
     hi_canvas.set_width((WIDTH as f64 * SCALE) as u32);
@@ -557,7 +666,9 @@ pub fn start() -> Result<(), JsValue> {
 
     {
         let app = app.clone();
-        let cb = Closure::<dyn FnMut(KeyboardEvent)>::new(move |e: KeyboardEvent| app.borrow_mut().on_key(&e));
+        let cb = Closure::<dyn FnMut(KeyboardEvent)>::new(move |e: KeyboardEvent| {
+            app.borrow_mut().on_key(&e)
+        });
         window().add_event_listener_with_callback("keydown", cb.as_ref().unchecked_ref())?;
         cb.forget();
     }
@@ -577,7 +688,7 @@ pub fn start() -> Result<(), JsValue> {
     }
 
     // requestAnimationFrame loop.
-    let f: Rc<RefCell<Option<Closure<dyn FnMut(f64)>>>> = Rc::new(RefCell::new(None));
+    let f: Rc<RefCell<Option<FrameCallback>>> = Rc::new(RefCell::new(None));
     let g = f.clone();
     *g.borrow_mut() = Some(Closure::new(move |t: f64| {
         app.borrow_mut().animate(t);

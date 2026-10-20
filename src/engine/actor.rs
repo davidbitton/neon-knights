@@ -36,7 +36,13 @@ pub fn can_stand(pic: &Picture, x: i32, y: i32) -> bool {
 
 impl Actor {
     pub fn new(x: i32, y: i32) -> Self {
-        Actor { x, y, dir: Dir::Down, frame: 0, motion: Motion::Idle }
+        Actor {
+            x,
+            y,
+            dir: Dir::Down,
+            frame: 0,
+            motion: Motion::Idle,
+        }
     }
 
     pub fn is_moving(&self) -> bool {
@@ -102,7 +108,11 @@ impl Actor {
                 // Facing follows the dominant axis (vertical counts double,
                 // since it moves at half speed).
                 self.dir = if ddx.abs() >= ddy.abs() * 2 {
-                    if ddx > 0 { Dir::Right } else { Dir::Left }
+                    if ddx > 0 {
+                        Dir::Right
+                    } else {
+                        Dir::Left
+                    }
                 } else if ddy > 0 {
                     Dir::Down
                 } else {

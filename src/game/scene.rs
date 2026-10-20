@@ -44,7 +44,12 @@ pub const STOOLS: [i32; 4] = [62, 102, 142, 182];
 pub const GUS_POS: (i32, i32) = (151, 85);
 
 const fn hs(noun: Noun, click: Rect, near: Rect, approach: (i32, i32)) -> Hotspot {
-    Hotspot { noun, click, near, approach }
+    Hotspot {
+        noun,
+        click,
+        near,
+        approach,
+    }
 }
 
 const FRONT_OF_BAR: Rect = Rect::new(30, 115, 220, 128);
@@ -54,21 +59,81 @@ const BY_TABLE: Rect = Rect::new(226, 101, 316, 174);
 pub fn hotspots(state: &GameState) -> Vec<Hotspot> {
     let mut v = Vec::new();
     if !state.flag(Flag::TookMatchbook) {
-        v.push(hs(Noun::Matchbook, Rect::new(111, 74, 129, 84), Rect::new(95, 115, 145, 128), (120, 118)));
+        v.push(hs(
+            Noun::Matchbook,
+            Rect::new(111, 74, 129, 84),
+            Rect::new(95, 115, 145, 128),
+            (120, 118),
+        ));
     }
-    v.push(hs(Noun::Egg, Rect::new(185, 64, 201, 82), Rect::new(170, 115, 220, 128), (193, 118)));
-    v.push(hs(Noun::Bartender, Rect::new(138, 58, 164, 80), FRONT_OF_BAR, (151, 118)));
-    v.push(hs(Noun::Jukebox, Rect::new(219, 54, 253, 108), Rect::new(204, 101, 262, 128), (236, 112)));
-    v.push(hs(Noun::Door, Rect::new(259, 28, 297, 101), Rect::new(250, 101, 316, 122), (278, 106)));
-    v.push(hs(Noun::Restroom, Rect::new(5, 44, 35, 101), Rect::new(4, 101, 42, 126), (18, 108)));
-    v.push(hs(Noun::Patron, Rect::new(262, 106, 300, 124), BY_TABLE, (248, 140)));
-    v.push(hs(Noun::Table, Rect::new(256, 122, 304, 154), BY_TABLE, (248, 140)));
+    v.push(hs(
+        Noun::Egg,
+        Rect::new(185, 64, 201, 82),
+        Rect::new(170, 115, 220, 128),
+        (193, 118),
+    ));
+    v.push(hs(
+        Noun::Bartender,
+        Rect::new(138, 58, 164, 80),
+        FRONT_OF_BAR,
+        (151, 118),
+    ));
+    v.push(hs(
+        Noun::Jukebox,
+        Rect::new(219, 54, 253, 108),
+        Rect::new(204, 101, 262, 128),
+        (236, 112),
+    ));
+    v.push(hs(
+        Noun::Door,
+        Rect::new(259, 28, 297, 101),
+        Rect::new(250, 101, 316, 122),
+        (278, 106),
+    ));
+    v.push(hs(
+        Noun::Restroom,
+        Rect::new(5, 44, 35, 101),
+        Rect::new(4, 101, 42, 126),
+        (18, 108),
+    ));
+    v.push(hs(
+        Noun::Patron,
+        Rect::new(262, 106, 300, 124),
+        BY_TABLE,
+        (248, 140),
+    ));
+    v.push(hs(
+        Noun::Table,
+        Rect::new(256, 122, 304, 154),
+        BY_TABLE,
+        (248, 140),
+    ));
     for sx in STOOLS {
-        v.push(hs(Noun::Stool, Rect::new(sx - 7, 113, sx + 7, 134), Rect::new(30, 113, 220, 150), (sx, 137)));
+        v.push(hs(
+            Noun::Stool,
+            Rect::new(sx - 7, 113, sx + 7, 134),
+            Rect::new(30, 113, 220, 150),
+            (sx, 137),
+        ));
     }
-    v.push(hs(Noun::Sign, Rect::new(56, 17, 196, 35), Rect::new(0, 0, 320, 200), (120, 140)));
-    v.push(hs(Noun::Bottles, Rect::new(42, 35, 208, 76), FRONT_OF_BAR, (100, 118)));
-    v.push(hs(Noun::Bar, Rect::new(32, 76, 218, 114), FRONT_OF_BAR, (100, 118)));
+    v.push(hs(
+        Noun::Sign,
+        Rect::new(56, 17, 196, 35),
+        Rect::new(0, 0, 320, 200),
+        (120, 140),
+    ));
+    v.push(hs(
+        Noun::Bottles,
+        Rect::new(42, 35, 208, 76),
+        FRONT_OF_BAR,
+        (100, 118),
+    ));
+    v.push(hs(
+        Noun::Bar,
+        Rect::new(32, 76, 218, 114),
+        FRONT_OF_BAR,
+        (100, 118),
+    ));
     v
 }
 
@@ -83,7 +148,9 @@ pub fn hotspot_for(state: &GameState, noun: Noun) -> Option<Hotspot> {
 /// Is the hero standing close enough to `noun` to touch it?
 pub fn is_near(state: &GameState, noun: Noun) -> bool {
     let (x, y) = state.hero;
-    hotspots(state).iter().any(|h| h.noun == noun && h.near.contains(x, y))
+    hotspots(state)
+        .iter()
+        .any(|h| h.noun == noun && h.near.contains(x, y))
 }
 
 /// The word used when a click turns into a typed command.
@@ -162,7 +229,16 @@ pub fn draw_bar(state: &GameState) -> Picture {
     for (y0, y1) in [(51, 53), (72, 74)] {
         p.fill_rect(44, y0, 206, y1, c(BROWN));
     }
-    let bottle_colors = [GREEN, YELLOW, LIGHT_RED, LIGHT_GREEN, MAGENTA, WHITE, BROWN, LIGHT_BLUE];
+    let bottle_colors = [
+        GREEN,
+        YELLOW,
+        LIGHT_RED,
+        LIGHT_GREEN,
+        MAGENTA,
+        WHITE,
+        BROWN,
+        LIGHT_BLUE,
+    ];
     let mut rng = Lcg(42);
     for (shelf_y, start) in [(51, 50), (72, 48)] {
         let mut x = start;
@@ -182,7 +258,16 @@ pub fn draw_bar(state: &GameState) -> Picture {
     p.rect(ax - 1, 19, ax + 2, 22, c(LIGHT_MAGENTA));
     p.line(ax, 22, ax, 33, c(LIGHT_MAGENTA));
     p.line(ax - 4, 24, ax + 4, 24, c(LIGHT_MAGENTA));
-    p.polyline(&[(ax - 7, 29), (ax - 5, 32), (ax, 33), (ax + 5, 32), (ax + 7, 29)], c(LIGHT_MAGENTA));
+    p.polyline(
+        &[
+            (ax - 7, 29),
+            (ax - 5, 32),
+            (ax, 33),
+            (ax + 5, 32),
+            (ax + 7, 29),
+        ],
+        c(LIGHT_MAGENTA),
+    );
     p.line(ax - 7, 29, ax - 8, 31, c(LIGHT_MAGENTA));
     p.line(ax + 7, 29, ax + 8, 31, c(LIGHT_MAGENTA));
     for (x0, x1) in [(60, 112), (140, 192)] {
@@ -193,7 +278,10 @@ pub fn draw_bar(state: &GameState) -> Picture {
     // Hanging lamps.
     for lx in [70, 186] {
         p.line(lx, 0, lx, 12, c(DARK_GRAY));
-        p.fill_polygon(&[(lx - 7, 18), (lx + 7, 18), (lx + 3, 12), (lx - 3, 12)], c(GREEN));
+        p.fill_polygon(
+            &[(lx - 7, 18), (lx + 7, 18), (lx + 3, 12), (lx - 3, 12)],
+            c(GREEN),
+        );
         p.fill_rect(lx - 1, 18, lx + 2, 20, c(YELLOW));
     }
 
@@ -222,13 +310,31 @@ pub fn draw_bar(state: &GameState) -> Picture {
     let jpri = priority_for_y(106);
     let lit = state.flag(Flag::PlayedJukebox);
     p.fill_ellipse(236, 66, 14, 9, Pen::color(YELLOW).pri(jpri));
-    p.fill_ellipse(236, 67, 11, 7, Pen::color(if lit { LIGHT_MAGENTA } else { MAGENTA }).pri(jpri));
+    p.fill_ellipse(
+        236,
+        67,
+        11,
+        7,
+        Pen::color(if lit { LIGHT_MAGENTA } else { MAGENTA }).pri(jpri),
+    );
     p.fill_rect(222, 67, 251, 106, Pen::color(RED).pri(jpri));
     p.rect(222, 67, 251, 106, Pen::color(BLACK).pri(jpri));
-    p.fill_rect(226, 70, 247, 78, Pen::color(if lit { LIGHT_CYAN } else { CYAN }).pri(jpri));
+    p.fill_rect(
+        226,
+        70,
+        247,
+        78,
+        Pen::color(if lit { LIGHT_CYAN } else { CYAN }).pri(jpri),
+    );
     p.fill_rect(226, 82, 247, 100, Pen::color(BLACK).pri(jpri));
     for x in (227..247).step_by(3) {
-        p.line(x, 83, x, 99, Pen::color(if lit { YELLOW } else { BROWN }).pri(jpri));
+        p.line(
+            x,
+            83,
+            x,
+            99,
+            Pen::color(if lit { YELLOW } else { BROWN }).pri(jpri),
+        );
     }
     p.fill_rect(234, 79, 239, 81, Pen::color(DARK_GRAY).pri(jpri)); // coin slot
     p.fill_rect(218, 100, 255, 109, Pen::control_only(CTRL_BLOCK));
@@ -299,7 +405,11 @@ pub fn draw_title() -> Picture {
     }
     for y in 86..120 {
         for x in 0..320 {
-            let col = if y >= 108 || (y >= 98 && (x + y) % 2 == 0) { MAGENTA } else { BLUE };
+            let col = if y >= 108 || (y >= 98 && (x + y) % 2 == 0) {
+                MAGENTA
+            } else {
+                BLUE
+            };
             p.plot(x, y, c(col));
         }
     }
@@ -335,14 +445,33 @@ pub fn draw_title() -> Picture {
     // Palm trees.
     for (bx, lean) in [(180, 18), (300, -14)] {
         let top = (bx + lean, 70);
-        p.fill_polygon(&[(bx - 3, 160), (bx + 3, 160), (top.0 + 2, top.1), (top.0 - 1, top.1)], c(BLACK));
-        for (dx, dy) in [(-28, 10), (-20, -6), (0, -12), (22, -6), (28, 10), (12, 16), (-14, 16)] {
+        p.fill_polygon(
+            &[
+                (bx - 3, 160),
+                (bx + 3, 160),
+                (top.0 + 2, top.1),
+                (top.0 - 1, top.1),
+            ],
+            c(BLACK),
+        );
+        for (dx, dy) in [
+            (-28, 10),
+            (-20, -6),
+            (0, -12),
+            (22, -6),
+            (28, 10),
+            (12, 16),
+            (-14, 16),
+        ] {
             let (ex, ey) = (top.0 + dx, top.1 + dy);
             let mid = (top.0 + dx / 2, top.1 + dy / 2 - 5);
             p.fill_polygon(&[top, mid, (ex, ey), (mid.0, mid.1 + 3)], c(BLACK));
         }
     }
-    p.fill_polygon(&[(150, 200), (150, 165), (220, 158), (320, 162), (320, 200)], c(BROWN));
+    p.fill_polygon(
+        &[(150, 200), (150, 165), (220, 158), (320, 162), (320, 200)],
+        c(BROWN),
+    );
     p
 }
 
@@ -369,14 +498,36 @@ pub fn draw_tomb() -> Picture {
     p.fill_rect(34, 144, 107, 150, c(DARK_GRAY));
     let g = c(DARK_GRAY);
     // R
-    p.polyline(&[(52, 96), (52, 82), (58, 82), (60, 84), (60, 87), (58, 89), (52, 89)], g);
+    p.polyline(
+        &[
+            (52, 96),
+            (52, 82),
+            (58, 82),
+            (60, 84),
+            (60, 87),
+            (58, 89),
+            (52, 89),
+        ],
+        g,
+    );
     p.line(55, 89, 60, 96, g);
     // I
     p.line(68, 82, 68, 96, g);
     p.line(66, 82, 70, 82, g);
     p.line(66, 96, 70, 96, g);
     // P
-    p.polyline(&[(78, 96), (78, 82), (85, 82), (87, 84), (87, 87), (85, 89), (78, 89)], g);
+    p.polyline(
+        &[
+            (78, 96),
+            (78, 82),
+            (85, 82),
+            (87, 84),
+            (87, 87),
+            (85, 89),
+            (78, 89),
+        ],
+        g,
+    );
     // Crack and epitaph scratches.
     p.polyline(&[(92, 100), (88, 108), (91, 114), (86, 124)], g);
     for y in [106, 112, 118, 124, 130] {
@@ -386,10 +537,10 @@ pub fn draw_tomb() -> Picture {
     p.fill_ellipse(112, 150, 5, 4, c(YELLOW));
     p.plot(110, 148, c(WHITE));
     // Bare tree.
-    p.fill_polygon(&[(150, 150), (156, 150), (154, 70), (152, 70)], c(BROWN));
-    p.line(153, 90, 170, 74, c(BROWN));
-    p.line(153, 100, 138, 86, c(BROWN));
-    p.line(162, 82, 168, 66, c(BROWN));
+    p.fill_polygon(&[(8, 150), (14, 150), (12, 64), (10, 64)], c(BROWN));
+    p.line(11, 90, 26, 72, c(BROWN));
+    p.line(12, 104, 2, 92, c(BROWN));
+    p.line(20, 80, 24, 62, c(BROWN));
     p
 }
 
@@ -410,7 +561,11 @@ mod tests {
             }
             let (x, y) = h.approach;
             assert!(can_stand(&pic, x, y), "{:?} approach {x},{y}", h.noun);
-            assert!(h.near.contains(x, y), "{:?} approach outside near-rect", h.noun);
+            assert!(
+                h.near.contains(x, y),
+                "{:?} approach outside near-rect",
+                h.noun
+            );
         }
     }
 
@@ -436,7 +591,10 @@ mod tests {
         let mut s = GameState::new();
         assert!(hotspot_at(&s, 120, 79).map(|h| h.noun) == Some(Noun::Matchbook));
         s.set(Flag::TookMatchbook);
-        assert_ne!(hotspot_at(&s, 120, 79).map(|h| h.noun), Some(Noun::Matchbook));
+        assert_ne!(
+            hotspot_at(&s, 120, 79).map(|h| h.noun),
+            Some(Noun::Matchbook)
+        );
         let pic = draw_bar(&s);
         assert_ne!(pic.visual_at(120, 78), Some(RED));
     }
