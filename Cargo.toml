@@ -19,7 +19,7 @@ js-sys = "0.3"
 web-sys = { version = "0.3", features = [
   "Window", "Document", "Element", "HtmlElement", "HtmlCanvasElement",
   "CanvasRenderingContext2d", "ImageData", "KeyboardEvent", "MouseEvent",
-  "Event", "EventTarget", "Storage", "DomRect", "console",
+  "Event", "EventTarget", "Location", "Storage", "DomRect", "console",
   "AudioContext", "AudioContextState", "BaseAudioContext", "AudioNode",
   "AudioParam", "AudioDestinationNode", "AudioScheduledSourceNode",
   "OscillatorNode", "OscillatorType", "GainNode",

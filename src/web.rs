@@ -3,7 +3,7 @@
 //! them to the DOM. Everything, text included, is drawn into the 320x200
 //! framebuffer, which one CSS-scaled canvas displays.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
 use std::rc::Rc;
 
@@ -33,6 +33,17 @@ const MAX_LINES: usize = 15;
 const MAX_INPUT: usize = 44;
 const SOUND_KEY: &str = "neon-knights.sound";
 const W: i32 = WIDTH as i32;
+
+thread_local! {
+    /// Set by a `?test` query parameter: the clock stops (time only moves
+    /// via `test_step`) and the `test_*` hooks below become available.
+    static TEST_MODE: Cell<bool> = const { Cell::new(false) };
+    static APP: RefCell<Option<Rc<RefCell<App>>>> = const { RefCell::new(None) };
+}
+
+fn test_mode() -> bool {
+    TEST_MODE.with(Cell::get)
+}
 const H: i32 = HEIGHT as i32;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -607,6 +618,10 @@ impl App {
         let last = self.last_t.unwrap_or(t);
         self.last_t = Some(t);
         self.acc = (self.acc + (t - last)).min(500.0);
+        if test_mode() {
+            // Frozen clock: tests advance time explicitly with test_step.
+            self.acc = 0.0;
+        }
         while self.acc >= TICK_MS {
             self.acc -= TICK_MS;
             self.tick();
@@ -614,6 +629,56 @@ impl App {
         if let Err(e) = self.render() {
             web_sys::console::error_1(&e);
         }
+    }
+
+    /// Tick until the hero has arrived and any queued click action has run,
+    /// or a message box / mode change interrupts. Returns ticks used.
+    fn until_idle(&mut self, max: u32) -> u32 {
+        let mut n = 0;
+        while n < max {
+            if self.mode != Mode::Playing || !self.queue.is_empty() {
+                break;
+            }
+            if !self.hero.is_moving() && self.pending.is_none() {
+                break;
+            }
+            self.tick();
+            n += 1;
+        }
+        n
+    }
+
+    fn state_json(&self) -> String {
+        let st = &self.game.state;
+        let msg = self
+            .queue
+            .front()
+            .map_or("null".to_string(), |m| json_str(m));
+        let inv: String = st.inventory.iter().map(|i| i.code()).collect();
+        format!(
+            concat!(
+                "{{\"mode\":\"{:?}\",\"scene\":\"{:?}\",\"score\":{},\"cash\":{},\"inventory\":{},",
+                "\"hero\":[{},{}],\"moving\":{},\"pending\":{},\"message\":{},\"queue\":{},",
+                "\"verb\":\"{}\",\"input\":{},\"muted\":{},\"ticks\":{},\"dead\":{},\"flags\":{}}}"
+            ),
+            self.mode,
+            st.scene,
+            st.score,
+            st.cash,
+            json_str(&inv),
+            self.hero.x,
+            self.hero.y,
+            self.hero.is_moving(),
+            self.pending.is_some(),
+            msg,
+            self.queue.len(),
+            VERBS[self.verb].0,
+            json_str(&self.input),
+            self.speaker.muted,
+            self.ticks,
+            st.dead,
+            st.flags
+        )
     }
 
     // ---------------------------------------------------------------- draw
@@ -880,7 +945,14 @@ pub fn start() -> Result<(), JsValue> {
         .get_context("2d")?
         .ok_or("no 2d context")?
         .dyn_into::<CanvasRenderingContext2d>()?;
+    let search = window().location().search().unwrap_or_default();
+    let test = search
+        .trim_start_matches('?')
+        .split('&')
+        .any(|p| p == "test" || p.starts_with("test="));
+    TEST_MODE.with(|t| t.set(test));
     let app = Rc::new(RefCell::new(App::new(ctx, canvas.clone())));
+    APP.with(|a| *a.borrow_mut() = Some(app.clone()));
 
     {
         let app = app.clone();
@@ -916,4 +988,69 @@ pub fn start() -> Result<(), JsValue> {
     }));
     window().request_animation_frame(g.borrow().as_ref().unwrap().as_ref().unchecked_ref())?;
     Ok(())
+}
+
+fn json_str(s: &str) -> String {
+    let mut out = String::from("\"");
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
+// -------------------------------------------------------------------- test hooks
+//
+// Only usable when the page was opened with `?test`. The UI test suite
+// (tests/ui) drives the game with real keyboard and mouse events and uses
+// these to advance time deterministically and to inspect state and pixels.
+
+fn with_app<R>(f: impl FnOnce(&mut App) -> R) -> Result<R, JsValue> {
+    if !test_mode() {
+        return Err(JsValue::from_str(
+            "test hooks need the ?test query parameter",
+        ));
+    }
+    APP.with(|a| a.borrow().clone())
+        .map(|app| f(&mut app.borrow_mut()))
+        .ok_or_else(|| JsValue::from_str("game not started"))
+}
+
+/// Game/UI state as JSON: mode, scene, score, current message, hero, etc.
+#[wasm_bindgen]
+pub fn test_state() -> Result<String, JsValue> {
+    with_app(|a| a.state_json())
+}
+
+/// Advance the (frozen) game clock by `n` ticks of 50 ms.
+#[wasm_bindgen]
+pub fn test_step(n: u32) -> Result<(), JsValue> {
+    with_app(|a| (0..n).for_each(|_| a.tick()))
+}
+
+/// Tick until the hero stops and any click action has run (max `max` ticks).
+#[wasm_bindgen]
+pub fn test_until_idle(max: u32) -> Result<u32, JsValue> {
+    with_app(|a| a.until_idle(max))
+}
+
+/// The composed 320x200 frame as EGA palette indices (row-major).
+#[wasm_bindgen]
+pub fn test_framebuffer() -> Result<Vec<u8>, JsValue> {
+    with_app(|a| {
+        a.compose();
+        a.frame.pixels.clone()
+    })
+}
+
+/// The 16-color palette as 48 bytes of RGB.
+#[wasm_bindgen]
+pub fn test_palette() -> Vec<u8> {
+    EGA.iter().flatten().copied().collect()
 }
