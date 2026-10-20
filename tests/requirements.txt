@@ -1,0 +1,6 @@
+# Pinned dependencies for the browser UI tests (tests/ui). CI installs these
+# and then `python -m playwright install --with-deps chromium`.
+playwright==1.64.0
+pytest==9.1.1
+pytest-playwright==0.10.0
+pillow==13.0.0
