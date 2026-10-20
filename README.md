@@ -4,8 +4,20 @@ Repository: https://github.com/davidbitton/neon-knights
 
 A tiny browser adventure game written in plain Rust and compiled to
 WebAssembly. Chip Valentine, a cheesy guy in a powder-blue tuxedo, spends one
-night in Ocean Bluffs, a run-down beach town. Milestone 1 contains a single
-fully playable scene: **The Rusty Anchor**, a dive bar.
+night in Ocean Bluffs, a run-down beach town, trying to reach the mysterious
+Vonda on the casino roof. The game has six scenes:
+
+| Scene | Who's there |
+|---|---|
+| **The Rusty Anchor**, a dive bar | Gus, the one-eyed bartender |
+| **The Boardwalk**, the hub that connects everything | Dot, a roller-skating hot dog vendor |
+| **Back Alley** | a mime trapped in an invisible box |
+| **Lucky Gull 24/7**, a convenience store | Brenda, a deeply bored clerk |
+| **The Golden Clam**, a casino lobby | Tiny, a doorman who is not tiny |
+| **The Crow's Nest**, a rooftop lounge | Vonda, a lounge singer in sequins |
+
+You get from scene to scene by walking through doorways or off the edge of
+the screen, or by typing things like `enter store` or `go to casino`.
 
 > **Neon Knights is an original parody/homage** in the style of the late-1980s
 > Sierra-style parser adventures (16-color EGA graphics, a typed command line,
@@ -17,21 +29,28 @@ fully playable scene: **The Rusty Anchor**, a dive bar.
 ## Playing
 
 * **Type commands** at the `>` prompt and press Enter: `look`, `look at bartender`,
-  `take matchbook`, `read matchbook`, `talk to gus`, `use quarter on jukebox`,
-  `order drink`, `inventory` / `i`, `score`, `help`, `save`, `restore`, `restart`, `quit`.
+  `take matchbook`, `talk to gus`, `use quarter on jukebox`, `give hot dog to mime`,
+  `buy carnation`, `wear carnation`, `enter casino`, `inventory` / `i`, `score`,
+  `help`, `save`, `restore`, `restart`, `quit`.
   Synonyms (`examine`, `x`, `l`, `get`, `grab`, `pick up` ...) and filler words
   (`the`, `at`, `to`, `with` ...) are understood.
 * **Arrow keys** walk (press the same arrow again to stop, old-school).
-* **Click** the floor to walk there. Click a thing to apply the current
+* **Click** the floor to walk there. Chip finds a route around the
+  furniture, and he won't wander through a doorway unless you clicked it. Click a thing to apply the current
   click-verb to it (it types the command for you, e.g. clicking Gus with the
   Look verb runs `look bartender`). **Right-click or Tab** cycles the verb
   (Walk / Look / Take / Talk / Use). Non-look verbs walk Chip over first.
 * Message boxes pause the game: press Enter, Esc, Space or click to dismiss.
-* The game saves to one `localStorage` slot (`neon-knights.save.v1`). Saves made
-  by early builds under the old working title "Neon Nights"
-  (`neon-nights.save.v1`) are picked up and migrated automatically on restore.
+* The game saves to one `localStorage` slot (`neon-knights.save.v1`). The save
+  stores the scene, Chip's position, score, inventory, cash, every puzzle
+  flag and conversation progress. It's a versioned text record (`NN2|...`).
+  Milestone 1 saves (`NN1|...`, always in the bar) still load. So do saves
+  made under the old working title "Neon Nights" (`neon-nights.save.v1`),
+  which are migrated to the new key on restore.
 
-There are 20 points in the Rusty Anchor, and at least one way to die.
+There are **60 points**. Every point can be earned, and each one only once.
+There are **five ways to die**, and each gets its own tombstone and epitaph.
+Stuck? [WALKTHROUGH.md](WALKTHROUGH.md) has the full solution (spoilers!).
 
 ## Building
 
@@ -54,8 +73,9 @@ trunk build --release      # production build into dist/
 cd dist && python3 -m http.server 8080   # then open http://localhost:8080
 ```
 
-Optional browser smoke test (Playwright, Chromium) that plays through the
-scene and writes screenshots (default `/workspace/neon-nights-shots/`, override
+There's an optional browser smoke test (Playwright, Chromium). It plays the
+whole game from the title screen to the ending, dies once along the way, and
+writes screenshots (default `/workspace/neon-nights-shots/`, override
 with `SHOTS_DIR`):
 
 ```sh
@@ -75,11 +95,16 @@ src/
     sprite.rs       ASCII-art sprites defined in code, priority-aware blitting,
                     hero walk cycle (4 directions), Gus the bartender
     actor.rs        movement over the walkable (control) plane, arrows + click-to-walk
+    path.rs         breadth-first click-to-walk path-finding on the step lattice
   game/             pure game logic, no browser types
     parser.rs       verb-noun parser: synonyms, filler words, errors
-    state.rs        score, inventory, flags, save-game (de)serialization
-    logic.rs        command handling, scoring, death, and all of the writing
-    scene.rs        vector pictures (bar, title, tombstone) + hotspot geometry
+    state.rs        scenes, score, inventory, flags, versioned save format
+    logic/          command handling: shared rules (travel, items, deaths) in
+                    mod.rs, one file of rules + writing per scene, and the
+                    full-walkthrough / death / save tests
+    world/          per-scene vector pictures, hotspots, exits and NPC
+                    animation; npcs.rs (NPC sprites); screens.rs (title,
+                    tombstones, ending)
     text.rs         word wrap
   web.rs            wasm-bindgen/web-sys front-end: canvas, input, UI, localStorage
 index.html          trunk entry point; nearest-neighbor scaled canvas
