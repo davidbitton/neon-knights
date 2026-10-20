@@ -1,5 +1,10 @@
 # Neon Knights: A Gentleman's Evening Out
 
+[![Rust](https://github.com/davidbitton/neon-knights/actions/workflows/rust.yml/badge.svg)](https://github.com/davidbitton/neon-knights/actions/workflows/rust.yml)
+[![Pages](https://github.com/davidbitton/neon-knights/actions/workflows/pages.yml/badge.svg)](https://github.com/davidbitton/neon-knights/actions/workflows/pages.yml)
+
+**[Play it in your browser: https://davidbitton.github.io/neon-knights/](https://davidbitton.github.io/neon-knights/)**
+
 Repository: https://github.com/davidbitton/neon-knights
 
 A tiny browser adventure game written in plain Rust and compiled to
@@ -41,6 +46,13 @@ the screen, or by typing things like `enter store` or `go to casino`.
   Look verb runs `look bartender`). **Right-click or Tab** cycles the verb
   (Walk / Look / Take / Talk / Use). Non-look verbs walk Chip over first.
 * Message boxes pause the game: press Enter, Esc, Space or click to dismiss.
+* **Sound**: square-wave PC-speaker beeps (a title jingle, score blips, a
+  death dirge, an ending fanfare, and a buzz when the parser is confused). Type
+  `sound off` / `sound on` (or `mute` / `unmute`), or press **M** whenever
+  you're not typing a command (title screen, message boxes, tombstone,
+  ending). The setting is remembered in `localStorage`
+  (`neon-knights.sound`). Audio starts only after your first key press or
+  click, as browsers require.
 * The game saves to one `localStorage` slot (`neon-knights.save.v1`). The save
   stores the scene, Chip's position, score, inventory, cash, every puzzle
   flag and conversation progress. It's a versioned text record (`NN2|...`).
@@ -51,6 +63,18 @@ the screen, or by typing things like `enter store` or `go to casino`.
 There are **60 points**. Every point can be earned, and each one only once.
 There are **five ways to die**, and each gets its own tombstone and epitaph.
 Stuck? [WALKTHROUGH.md](WALKTHROUGH.md) has the full solution (spoilers!).
+
+## Continuous integration and deployment
+
+* `.github/workflows/rust.yml` ("Rust") is GitHub's Rust starter workflow,
+  extended. On every push and pull request to `main` it runs on a pinned
+  toolchain: `cargo fmt --check`, build, tests, clippy (native and
+  `wasm32-unknown-unknown`, with `-D warnings`) and a release wasm32 build.
+* `.github/workflows/pages.yml` ("Pages") runs on every push to `main` (or
+  by hand). It builds the site with
+  `trunk build --release --public-url /neon-knights/` and deploys it to
+  GitHub Pages. In the repository settings, Pages must be set to
+  **Source: GitHub Actions**.
 
 ## Building
 
@@ -83,6 +107,15 @@ pip install playwright && playwright install chromium
 python3 tools/smoke_test.py http://localhost:8080/
 ```
 
+To check the GitHub Pages build locally, build it under the project subpath
+and serve it from a matching directory:
+
+```sh
+trunk build --release --public-url /neon-knights/ --dist /tmp/site/neon-knights
+(cd /tmp/site && python3 -m http.server 8081 &)
+python3 tools/smoke_test.py http://localhost:8081/neon-knights/
+```
+
 ## Layout
 
 ```
@@ -90,6 +123,7 @@ src/
   lib.rs            crate root; `web` is compiled only for wasm32
   engine/           platform-independent, unit-tested natively
     palette.rs      16-color EGA palette
+    font.rs         "Chip Mono", an original 5x8 bitmap font drawn into the framebuffer
     gfx.rs          320x200 framebuffer; AGI-style visual / priority / control
                     planes; lines, rects, scanline polygons, ellipses, flood fill
     sprite.rs       ASCII-art sprites defined in code, priority-aware blitting,
@@ -105,20 +139,22 @@ src/
     world/          per-scene vector pictures, hotspots, exits and NPC
                     animation; npcs.rs (NPC sprites); screens.rs (title,
                     tombstones, ending)
-    text.rs         word wrap
-  web.rs            wasm-bindgen/web-sys front-end: canvas, input, UI, localStorage
+    sound.rs        PC-speaker tunes as (frequency, duration) note lists
+    text.rs         word wrap and message pagination
+  web.rs            wasm-bindgen/web-sys front-end: canvas, input, UI, Web Audio, localStorage
 index.html          trunk entry point; nearest-neighbor scaled canvas
 tools/smoke_test.py headless-browser smoke test
+.github/workflows/  CI (rust.yml) and GitHub Pages deployment (pages.yml)
 ```
 
 How rendering works: every frame the scene's *visual* plane is copied into an
 indexed 320x200 frame, sprites are drawn only where their priority (derived from
 their feet's y position, in 12-pixel bands) is at least the picture's priority
 at that pixel, then the frame is expanded to RGBA and put on a 320x200 canvas
-that CSS scales up with `image-rendering: pixelated`. Text (status bar, command
-line, message-box text) is drawn on a second, higher-resolution overlay canvas
-on a fixed character grid; the boxes and borders themselves are framebuffer
-pixels.
+that CSS scales up with `image-rendering: pixelated`. All text is drawn into
+the same framebuffer with the built-in bitmap font: the status bar, the command
+line, message boxes, tombstones, the ending, and the title (drawn at 4x and 2x
+scale). So text scales and crunches exactly like the art does.
 
 ## License
 
