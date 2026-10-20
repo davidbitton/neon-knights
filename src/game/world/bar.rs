@@ -1,61 +1,26 @@
-//! Scene content: AGI-style vector pictures (all defined in code, no image
-//! files) plus hotspot geometry for The Rusty Anchor.
-//!
-//! Layout follows the old interpreters: status bar on row band 0..9, the
-//! picture in 9..176, the command line below it.
+//! The Rusty Anchor, a dive bar on the boardwalk.
 
-use super::parser::Noun;
-use super::state::{Flag, GameState};
+use super::{c, hs, rect_sprite, Exit, Hotspot, Lcg, Placed, Rect, PIC_BOTTOM};
 use crate::engine::gfx::{priority_for_y, Pen, Picture, CTRL_BLOCK, CTRL_WALK};
 use crate::engine::palette::*;
-
-pub const STATUS_H: i32 = 9;
-pub const PIC_BOTTOM: i32 = 176;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Rect {
-    pub x0: i32,
-    pub y0: i32,
-    pub x1: i32,
-    pub y1: i32,
-}
-
-impl Rect {
-    pub const fn new(x0: i32, y0: i32, x1: i32, y1: i32) -> Rect {
-        Rect { x0, y0, x1, y1 }
-    }
-    pub fn contains(&self, x: i32, y: i32) -> bool {
-        x >= self.x0 && x < self.x1 && y >= self.y0 && y < self.y1
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct Hotspot {
-    pub noun: Noun,
-    /// Clickable area on screen.
-    pub click: Rect,
-    /// Where the hero's feet must be to interact (take/use/talk).
-    pub near: Rect,
-    /// A walkable spot inside `near` to walk to.
-    pub approach: (i32, i32),
-}
+use crate::engine::sprite::{gus_frame, Sprite};
+use crate::game::parser::Noun;
+use crate::game::state::{Flag, GameState, SceneId};
 
 pub const STOOLS: [i32; 4] = [62, 102, 142, 182];
 pub const GUS_POS: (i32, i32) = (151, 85);
 
-const fn hs(noun: Noun, click: Rect, near: Rect, approach: (i32, i32)) -> Hotspot {
-    Hotspot {
-        noun,
-        click,
-        near,
-        approach,
-    }
-}
-
 const FRONT_OF_BAR: Rect = Rect::new(30, 115, 220, 128);
 const BY_TABLE: Rect = Rect::new(226, 101, 316, 174);
 
-/// Hotspots in hit-test priority order (small things first).
+pub const EXITS: [Exit; 1] = [Exit {
+    zone: Rect::new(262, 101, 296, 105),
+    to: SceneId::Boardwalk,
+    arrive: (51, 110),
+    nouns: &[Noun::Door, Noun::Boardwalk],
+    back: (278, 112),
+}];
+
 pub fn hotspots(state: &GameState) -> Vec<Hotspot> {
     let mut v = Vec::new();
     if !state.flag(Flag::TookMatchbook) {
@@ -88,7 +53,7 @@ pub fn hotspots(state: &GameState) -> Vec<Hotspot> {
         Noun::Door,
         Rect::new(259, 28, 297, 101),
         Rect::new(250, 101, 316, 122),
-        (278, 106),
+        (278, 103),
     ));
     v.push(hs(
         Noun::Restroom,
@@ -137,61 +102,47 @@ pub fn hotspots(state: &GameState) -> Vec<Hotspot> {
     v
 }
 
-pub fn hotspot_at(state: &GameState, x: i32, y: i32) -> Option<Hotspot> {
-    hotspots(state).into_iter().find(|h| h.click.contains(x, y))
+fn note_sprite() -> Sprite {
+    Sprite::from_rows(&["..YY", "..Y.", "..Y.", "YYY.", "YYY."])
 }
 
-pub fn hotspot_for(state: &GameState, noun: Noun) -> Option<Hotspot> {
-    hotspots(state).into_iter().find(|h| h.noun == noun)
+pub(crate) fn z_sprite() -> Sprite {
+    Sprite::from_rows(&["WWW", "..W", ".W.", "WWW"])
 }
 
-/// Is the hero standing close enough to `noun` to touch it?
-pub fn is_near(state: &GameState, noun: Noun) -> bool {
-    let (x, y) = state.hero;
-    hotspots(state)
-        .iter()
-        .any(|h| h.noun == noun && h.near.contains(x, y))
-}
-
-/// The word used when a click turns into a typed command.
-pub fn noun_word(n: Noun) -> &'static str {
-    match n {
-        Noun::Room => "room",
-        Noun::Bartender => "bartender",
-        Noun::Jukebox => "jukebox",
-        Noun::Matchbook => "matchbook",
-        Noun::Quarter => "quarter",
-        Noun::Comb => "comb",
-        Noun::Egg => "egg",
-        Noun::Drink => "drink",
-        Noun::Bar => "bar",
-        Noun::Stool => "stool",
-        Noun::Door => "door",
-        Noun::Restroom => "restroom",
-        Noun::Sign => "sign",
-        Noun::Bottles => "bottles",
-        Noun::Patron => "regular",
-        Noun::Table => "table",
-        Noun::Floor => "floor",
-        Noun::Me => "me",
+pub fn actors(state: &GameState, ticks: u64) -> Vec<Placed> {
+    let mut v = Vec::new();
+    if state.flag(Flag::PlayedJukebox) {
+        let cols = [LIGHT_CYAN, LIGHT_MAGENTA, YELLOW, LIGHT_GREEN];
+        v.push(Placed::top_left(
+            rect_sprite(21, 8, cols[(ticks / 4 % 4) as usize]),
+            226,
+            70,
+            15,
+        ));
+        let rise = (ticks % 30) as i32;
+        v.push(Placed::top_left(
+            note_sprite(),
+            240 + rise / 6,
+            54 - rise,
+            15,
+        ));
     }
-}
-
-/// Tiny deterministic PRNG for scenery (stars, wave glints).
-struct Lcg(u32);
-impl Lcg {
-    fn next(&mut self, n: u32) -> i32 {
-        self.0 = self.0.wrapping_mul(1_103_515_245).wrapping_add(12_345);
-        ((self.0 >> 16) % n) as i32
+    let zr = (ticks % 40) as i32;
+    if zr < 30 {
+        v.push(Placed::top_left(z_sprite(), 292 + zr / 6, 104 - zr / 2, 15));
     }
-}
-
-fn c(col: u8) -> Pen {
-    Pen::color(col)
+    v.push(Placed::feet(
+        gus_frame((ticks / 12 % 2) as u8),
+        GUS_POS.0,
+        GUS_POS.1,
+        priority_for_y(GUS_POS.1),
+    ));
+    v
 }
 
 /// The Rusty Anchor, a bar that has seen better decades.
-pub fn draw_bar(state: &GameState) -> Picture {
+pub fn draw(state: &GameState) -> Picture {
     let mut p = Picture::new();
     p.priority_bands();
 
@@ -392,197 +343,20 @@ pub fn draw_bar(state: &GameState) -> Picture {
     p
 }
 
-/// Title screen backdrop: a moonlit boardwalk.
-pub fn draw_title() -> Picture {
-    let mut p = Picture::new();
-    p.fill_rect(0, 0, 320, 200, c(BLACK));
-    for y in 50..86 {
-        for x in 0..320 {
-            if y >= 70 || (x + y) % 2 == 0 && y >= 58 || (x % 4 == 0 && y % 2 == 0) {
-                p.plot(x, y, c(BLUE));
-            }
-        }
-    }
-    for y in 86..120 {
-        for x in 0..320 {
-            let col = if y >= 108 || (y >= 98 && (x + y) % 2 == 0) {
-                MAGENTA
-            } else {
-                BLUE
-            };
-            p.plot(x, y, c(col));
-        }
-    }
-    p.fill_rect(0, 116, 320, 120, c(LIGHT_MAGENTA));
-    let mut rng = Lcg(1987);
-    for _ in 0..80 {
-        let (x, y) = (rng.next(320), rng.next(70));
-        p.plot(x, y, c(if rng.next(3) == 0 { WHITE } else { LIGHT_GRAY }));
-    }
-    p.fill_ellipse(262, 34, 13, 13, c(YELLOW));
-    p.fill_ellipse(258, 31, 2, 2, c(BROWN));
-    p.fill_ellipse(266, 39, 3, 2, c(BROWN));
-    // Ocean.
-    p.fill_rect(0, 120, 320, 200, c(BLUE));
-    for _ in 0..70 {
-        let (x, y) = (rng.next(320), 122 + rng.next(78));
-        p.line(x, y, x + 3 + rng.next(6), y, c(LIGHT_BLUE));
-    }
-    for i in 0..12 {
-        let y = 122 + i * 6;
-        let w = 4 + i;
-        p.line(262 - w, y, 262 + w, y, c(YELLOW));
-    }
-    // Pier and the bar.
-    p.fill_rect(0, 126, 140, 130, c(BROWN));
-    for x in (4..140).step_by(16) {
-        p.line(x, 130, x, 150, c(BLACK));
-    }
-    p.fill_rect(20, 100, 76, 126, c(DARK_GRAY));
-    p.fill_polygon(&[(16, 100), (80, 100), (48, 86)], c(RED));
-    p.fill_rect(30, 108, 44, 118, c(LIGHT_MAGENTA));
-    p.fill_rect(54, 110, 64, 126, c(BROWN));
-    // Palm trees.
-    for (bx, lean) in [(180, 18), (300, -14)] {
-        let top = (bx + lean, 70);
-        p.fill_polygon(
-            &[
-                (bx - 3, 160),
-                (bx + 3, 160),
-                (top.0 + 2, top.1),
-                (top.0 - 1, top.1),
-            ],
-            c(BLACK),
-        );
-        for (dx, dy) in [
-            (-28, 10),
-            (-20, -6),
-            (0, -12),
-            (22, -6),
-            (28, 10),
-            (12, 16),
-            (-14, 16),
-        ] {
-            let (ex, ey) = (top.0 + dx, top.1 + dy);
-            let mid = (top.0 + dx / 2, top.1 + dy / 2 - 5);
-            p.fill_polygon(&[top, mid, (ex, ey), (mid.0, mid.1 + 3)], c(BLACK));
-        }
-    }
-    p.fill_polygon(
-        &[(150, 200), (150, 165), (220, 158), (320, 162), (320, 200)],
-        c(BROWN),
-    );
-    p
-}
-
-/// Death screen backdrop: a lonely headstone (left half; text goes right).
-pub fn draw_tomb() -> Picture {
-    let mut p = Picture::new();
-    p.fill_rect(0, 0, 320, 200, c(BLACK));
-    let mut rng = Lcg(13);
-    for _ in 0..50 {
-        p.plot(rng.next(320), STATUS_H + rng.next(100), c(LIGHT_GRAY));
-    }
-    p.fill_ellipse(30, 30, 9, 9, c(LIGHT_GRAY));
-    p.fill_ellipse(33, 28, 8, 8, c(BLACK));
-    p.fill_rect(0, 140, 320, PIC_BOTTOM, c(GREEN));
-    for x in (0..320).step_by(2) {
-        p.plot(x, 139, c(GREEN));
-        p.plot(x + 1, 138 + (x % 3), c(DARK_GRAY));
-    }
-    // Headstone.
-    p.fill_ellipse(70, 76, 30, 16, c(LIGHT_GRAY));
-    p.fill_rect(40, 76, 101, 146, c(LIGHT_GRAY));
-    p.line(40, 76, 40, 145, c(DARK_GRAY));
-    p.line(100, 76, 100, 145, c(DARK_GRAY));
-    p.fill_rect(34, 144, 107, 150, c(DARK_GRAY));
-    let g = c(DARK_GRAY);
-    // R
-    p.polyline(
-        &[
-            (52, 96),
-            (52, 82),
-            (58, 82),
-            (60, 84),
-            (60, 87),
-            (58, 89),
-            (52, 89),
-        ],
-        g,
-    );
-    p.line(55, 89, 60, 96, g);
-    // I
-    p.line(68, 82, 68, 96, g);
-    p.line(66, 82, 70, 82, g);
-    p.line(66, 96, 70, 96, g);
-    // P
-    p.polyline(
-        &[
-            (78, 96),
-            (78, 82),
-            (85, 82),
-            (87, 84),
-            (87, 87),
-            (85, 89),
-            (78, 89),
-        ],
-        g,
-    );
-    // Crack and epitaph scratches.
-    p.polyline(&[(92, 100), (88, 108), (91, 114), (86, 124)], g);
-    for y in [106, 112, 118, 124, 130] {
-        p.line(50, y, 82, y, g);
-    }
-    // The culprit, at large.
-    p.fill_ellipse(112, 150, 5, 4, c(YELLOW));
-    p.plot(110, 148, c(WHITE));
-    // Bare tree.
-    p.fill_polygon(&[(8, 150), (14, 150), (12, 64), (10, 64)], c(BROWN));
-    p.line(11, 90, 26, 72, c(BROWN));
-    p.line(12, 104, 2, 92, c(BROWN));
-    p.line(20, 80, 24, 62, c(BROWN));
-    p
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engine::actor::can_stand;
-    use crate::engine::gfx::priority_for_y;
-
-    #[test]
-    fn start_and_approach_points_are_walkable() {
-        let s = GameState::new();
-        let pic = draw_bar(&s);
-        assert!(can_stand(&pic, s.hero.0, s.hero.1), "start position");
-        for h in hotspots(&s) {
-            if h.noun == Noun::Sign {
-                continue;
-            }
-            let (x, y) = h.approach;
-            assert!(can_stand(&pic, x, y), "{:?} approach {x},{y}", h.noun);
-            assert!(
-                h.near.contains(x, y),
-                "{:?} approach outside near-rect",
-                h.noun
-            );
-        }
-    }
+    use crate::game::world::{hotspot_at, hotspot_for, is_near};
 
     #[test]
     fn counter_hides_gus_legs_and_stools_occlude_hero() {
-        let pic = draw_bar(&GameState::new());
-        // Gus's feet are below the counter top -> hidden.
+        let pic = draw(&GameState::new());
         let gus_pri = priority_for_y(GUS_POS.1);
         assert!(pic.priority_at(GUS_POS.0, 84).unwrap() > gus_pri);
-        // His head (above the counter) is visible.
         assert!(pic.priority_at(GUS_POS.0, 66).unwrap() <= gus_pri);
-        // Hero standing just behind a stool is hidden by its pole...
         let sx = STOOLS[1];
         assert!(pic.priority_at(sx, 125).unwrap() > priority_for_y(122));
-        // ...but in front of it when standing south of the stool.
         assert!(pic.priority_at(sx, 125).unwrap() <= priority_for_y(140));
-        // The counter itself is not walkable.
         assert!(!pic.walkable(120, 105));
     }
 
@@ -595,7 +369,7 @@ mod tests {
             hotspot_at(&s, 120, 79).map(|h| h.noun),
             Some(Noun::Matchbook)
         );
-        let pic = draw_bar(&s);
+        let pic = draw(&s);
         assert_ne!(pic.visual_at(120, 78), Some(RED));
     }
 
@@ -606,13 +380,5 @@ mod tests {
         s.hero = hotspot_for(&s, Noun::Bartender).unwrap().approach;
         assert!(is_near(&s, Noun::Bartender));
         assert!(!is_near(&s, Noun::Jukebox));
-    }
-
-    #[test]
-    fn other_pictures_render() {
-        let t = draw_title();
-        assert_eq!(t.visual_at(262, 34), Some(YELLOW));
-        let d = draw_tomb();
-        assert_eq!(d.visual_at(45, 100), Some(LIGHT_GRAY));
     }
 }

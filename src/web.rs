@@ -15,11 +15,11 @@ use web_sys::{
 use crate::engine::actor::Actor;
 use crate::engine::gfx::{priority_for_y, Frame, Picture, HEIGHT, WIDTH};
 use crate::engine::palette::{self, *};
-use crate::engine::sprite::{gus_frame, hero_frame, Dir, Sprite};
-use crate::game::logic::{Death, Effect, HELP, INTRO};
-use crate::game::scene::{self, PIC_BOTTOM, STATUS_H};
-use crate::game::state::{GameState, START_POS};
+use crate::engine::sprite::{hero_frame, Dir};
+use crate::game::logic::{Death, Effect, Reply, HELP, INTRO};
+use crate::game::state::{GameState, SceneId, START_POS};
 use crate::game::text::wrap;
+use crate::game::world::{self, npcs, screens, Placed, PIC_BOTTOM, STATUS_H};
 use crate::game::{Game, LEGACY_SAVE_KEYS, SAVE_KEY, SUBTITLE, TITLE};
 
 const SCALE: f64 = 3.0;
@@ -36,6 +36,7 @@ enum Mode {
     Playing,
     Dead,
     Quit,
+    Ending,
 }
 
 /// Click verbs (right-click / Tab cycles them).
@@ -58,10 +59,12 @@ struct App {
     mode: Mode,
     game: Game,
     hero: Actor,
-    bar_pic: Picture,
-    bar_flags: u32,
+    /// The current scene's picture, cached by (scene, flags).
+    pic: Picture,
+    pic_key: (SceneId, u64),
     title_pic: Picture,
     tomb_pic: Picture,
+    ending_pic: Picture,
     frame: Frame,
     rgba: Vec<u8>,
     input: String,
@@ -69,6 +72,7 @@ struct App {
     queue: VecDeque<String>,
     death: Option<Death>,
     death_pending: bool,
+    ending_pending: bool,
     verb: usize,
     pending: Option<String>,
     ticks: u64,
@@ -115,14 +119,6 @@ fn ctx2d(c: &HtmlCanvasElement) -> Result<CanvasRenderingContext2d, JsValue> {
         .map_err(|_| JsValue::from_str("not a 2d context"))
 }
 
-fn note_sprite() -> Sprite {
-    Sprite::from_rows(&["..YY", "..Y.", "..Y.", "YYY.", "YYY."])
-}
-
-fn z_sprite() -> Sprite {
-    Sprite::from_rows(&["WWW", "..W", ".W.", "WWW"])
-}
-
 impl App {
     fn new(
         lo: CanvasRenderingContext2d,
@@ -130,8 +126,8 @@ impl App {
         hi_canvas: HtmlCanvasElement,
     ) -> App {
         let game = Game::new();
-        let bar_pic = scene::draw_bar(&game.state);
-        let bar_flags = game.state.flags;
+        let pic = world::draw(&game.state);
+        let pic_key = (game.state.scene, game.state.flags);
         // Pick the largest monospace size whose glyphs fit our text cell.
         let mut font = String::new();
         let mut glyph_w = 0.0;
@@ -148,10 +144,11 @@ impl App {
             mode: Mode::Title,
             hero: Actor::new(START_POS.0, START_POS.1),
             game,
-            bar_pic,
-            bar_flags,
-            title_pic: scene::draw_title(),
-            tomb_pic: scene::draw_tomb(),
+            pic,
+            pic_key,
+            title_pic: screens::draw_title(),
+            tomb_pic: screens::draw_tomb(crate::game::DeathKind::Egg),
+            ending_pic: screens::draw_ending(),
             frame: Frame::new(),
             rgba: Vec::with_capacity(WIDTH * HEIGHT * 4),
             input: String::new(),
@@ -159,6 +156,7 @@ impl App {
             queue: VecDeque::new(),
             death: None,
             death_pending: false,
+            ending_pending: false,
             verb: 1,
             pending: None,
             ticks: 0,
@@ -182,9 +180,20 @@ impl App {
         self.queue.push_back(INTRO.to_string());
         self.death = None;
         self.death_pending = false;
+        self.ending_pending = false;
         self.pending = None;
         self.input.clear();
         self.last_cmd = None;
+        self.sync_pic();
+    }
+
+    /// Redraw the scene picture if the scene or any flag changed.
+    fn sync_pic(&mut self) {
+        let key = (self.game.state.scene, self.game.state.flags);
+        if key != self.pic_key {
+            self.pic = world::draw(&self.game.state);
+            self.pic_key = key;
+        }
     }
 
     fn save(&mut self) {
@@ -209,10 +218,12 @@ impl App {
                 self.mode = Mode::Playing;
                 self.death = None;
                 self.death_pending = false;
+                self.ending_pending = false;
                 self.pending = None;
                 self.last_cmd = None;
                 self.input.clear();
                 self.queue.clear();
+                self.sync_pic();
                 self.queue.push_back(format!("Game restored. Previously, on {TITLE}..."));
             }
             Some(Err(_)) => self.queue.push_back("That saved game is corrupted. Much like this town.".into()),
@@ -227,12 +238,28 @@ impl App {
         self.game.state.hero = (self.hero.x, self.hero.y);
         let reply = self.game.input(&line);
         self.last_cmd = Some(line);
+        self.apply(reply);
+    }
+
+    fn apply(&mut self, reply: Reply) {
         self.queue.extend(reply.messages);
         match reply.effect {
             Effect::None | Effect::Scored(_) => {}
+            Effect::Moved => {
+                let (x, y) = self.game.state.hero;
+                self.hero = Actor::new(x, y);
+                self.pending = None;
+                self.sync_pic();
+            }
+            Effect::Won => {
+                self.hero.stop();
+                self.pending = None;
+                self.ending_pending = true;
+            }
             Effect::Died(d) => {
                 self.hero.stop();
                 self.pending = None;
+                self.tomb_pic = screens::draw_tomb(d.kind);
                 self.death = Some(d);
                 self.death_pending = true;
             }
@@ -252,6 +279,10 @@ impl App {
             self.death_pending = false;
             self.mode = Mode::Dead;
         }
+        if self.queue.is_empty() && self.ending_pending {
+            self.ending_pending = false;
+            self.mode = Mode::Ending;
+        }
     }
 
     // ---------------------------------------------------------------- input
@@ -270,7 +301,7 @@ impl App {
                     handled = false;
                 }
             }
-            Mode::Quit => {
+            Mode::Quit | Mode::Ending => {
                 if key == "Enter" || key == " " {
                     self.mode = Mode::Title;
                 } else {
@@ -327,6 +358,18 @@ impl App {
         }
     }
 
+    /// Click-to-walk: path-find around furniture and away from doorways
+    /// that aren't the destination.
+    fn walk(&mut self, to: (i32, i32)) {
+        let from = (self.hero.x, self.hero.y);
+        let steps = world::plan_walk(self.game.state.scene, &self.pic, from, to);
+        if steps.is_empty() {
+            self.hero.walk_to(to.0, to.1);
+        } else {
+            self.hero.follow(steps);
+        }
+    }
+
     fn arrow(&mut self, d: Dir) {
         self.pending = None;
         self.hero.press_dir(d);
@@ -344,7 +387,7 @@ impl App {
         let right = e.button() == 2;
         match self.mode {
             Mode::Title => self.restart(),
-            Mode::Quit => self.mode = Mode::Title,
+            Mode::Quit | Mode::Ending => self.mode = Mode::Title,
             Mode::Dead => {
                 if !self.queue.is_empty() {
                     self.dismiss();
@@ -376,22 +419,22 @@ impl App {
                 let hot = if self.verb == 0 {
                     None
                 } else {
-                    scene::hotspot_at(&self.game.state, x, y)
+                    world::hotspot_at(&self.game.state, x, y)
                 };
                 match hot {
                     Some(h) => {
                         let (_, word) = VERBS[self.verb];
-                        let cmd = format!("{word} {}", scene::noun_word(h.noun));
-                        if self.verb == 1 || scene::is_near(&self.game.state, h.noun) {
+                        let cmd = format!("{word} {}", world::noun_word(h.noun));
+                        if self.verb == 1 || world::is_near(&self.game.state, h.noun) {
                             self.submit(&cmd);
                         } else {
-                            self.hero.walk_to(h.approach.0, h.approach.1);
+                            self.walk(h.approach);
                             self.pending = Some(cmd);
                         }
                     }
                     None => {
                         self.pending = None;
-                        self.hero.walk_to(x, y);
+                        self.walk((x, y));
                     }
                 }
             }
@@ -405,12 +448,15 @@ impl App {
         if self.mode != Mode::Playing || !self.queue.is_empty() {
             return;
         }
-        if self.game.state.flags != self.bar_flags {
-            self.bar_pic = scene::draw_bar(&self.game.state);
-            self.bar_flags = self.game.state.flags;
-        }
-        self.hero.tick(&self.bar_pic);
+        self.sync_pic();
+        let moved = self.hero.tick(&self.pic);
         self.game.state.hero = (self.hero.x, self.hero.y);
+        if moved {
+            if let Some(r) = self.game.check_exits() {
+                self.apply(r);
+                return;
+            }
+        }
         if !self.hero.is_moving() {
             if let Some(cmd) = self.pending.take() {
                 self.submit(&cmd);
@@ -456,44 +502,49 @@ impl App {
         let pic = match self.mode {
             Mode::Title | Mode::Quit => &self.title_pic,
             Mode::Dead => &self.tomb_pic,
-            Mode::Playing => &self.bar_pic,
+            Mode::Playing => &self.pic,
+            Mode::Ending => &self.ending_pic,
         };
         self.frame.copy_from(pic);
         let f = &mut self.frame;
         if self.mode == Mode::Playing {
             let st = &self.game.state;
-            if st.flag(crate::game::Flag::PlayedJukebox) {
-                let cols = [LIGHT_CYAN, LIGHT_MAGENTA, YELLOW, LIGHT_GREEN];
-                let c = cols[(self.ticks / 4 % 4) as usize];
-                f.fill_rect(226, 70, 247, 78, c);
-                let rise = (self.ticks % 30) as i32;
-                note_sprite().blit(f, 240 + rise / 6, 54 - rise);
-            }
-            let zr = (self.ticks % 40) as i32;
-            if zr < 30 {
-                z_sprite().blit(f, 292 + zr / 6, 104 - zr / 2);
-            }
-            gus_frame((self.ticks / 12 % 2) as u8).blit_priority(
-                f,
-                &self.bar_pic,
-                scene::GUS_POS.0,
-                scene::GUS_POS.1,
-                priority_for_y(scene::GUS_POS.1),
-            );
+            let mut placed = world::actors(st, self.ticks);
             let hf = if self.hero.is_moving() {
                 self.hero.frame
             } else {
                 0
             };
-            hero_frame(self.hero.dir, hf).blit_priority(
-                f,
-                &self.bar_pic,
+            placed.push(Placed::feet(
+                hero_frame(self.hero.dir, hf),
                 self.hero.x,
                 self.hero.y,
                 priority_for_y(self.hero.y),
-            );
+            ));
+            // Painter's order: farther (higher on screen) first.
+            placed.sort_by_key(|p| (p.pri, p.y));
+            for p in &placed {
+                p.sprite.blit_priority(f, &self.pic, p.x, p.y, p.pri);
+            }
         }
-        if matches!(self.mode, Mode::Playing | Mode::Dead) {
+        if self.mode == Mode::Ending {
+            let bob = (self.ticks / 6 % 3) as u8;
+            let hf = (self.ticks / 4 % 4) as u8;
+            hero_frame(
+                Dir::Down,
+                if (self.ticks / 40).is_multiple_of(2) {
+                    0
+                } else {
+                    hf
+                },
+            )
+            .blit_priority(f, &self.ending_pic, 144, 168, 15);
+            npcs::vonda(bob).blit_priority(f, &self.ending_pic, 178, 168, 15);
+            let lines = self.game.ending_lines();
+            let (x0, y0, x1, y1) = Self::box_rect(&lines, (0, 12, WIDTH as i32, 134));
+            f.message_box(x0, y0, x1, y1, WHITE, MAGENTA);
+        }
+        if matches!(self.mode, Mode::Playing | Mode::Dead | Mode::Ending) {
             f.fill_rect(0, 0, WIDTH as i32, STATUS_H, WHITE);
             f.fill_rect(0, PIC_BOTTOM, WIDTH as i32, HEIGHT as i32, BLACK);
         }
@@ -564,7 +615,7 @@ impl App {
                 hi.set_shadow_blur(0.0);
                 hi.set_font(&self.font);
                 hi.set_fill_style_str(&palette::css(WHITE));
-                hi.fill_text("An original parody adventure  -  Milestone 1", 480.0, 290.0)?;
+                hi.fill_text("An original parody adventure", 480.0, 290.0)?;
                 if blink {
                     hi.set_fill_style_str(&palette::css(YELLOW));
                     hi.fill_text("Press ENTER or click to begin", 480.0, 530.0)?;
@@ -587,13 +638,40 @@ impl App {
                 hi.fill_text("Press ENTER to return to the title screen.", 480.0, 340.0)?;
                 hi.set_text_align("left");
             }
+            Mode::Ending => {
+                let score = self.game.score_line();
+                self.text(&score, 2, 0, BLACK);
+                let place = "The End";
+                self.text(place, WIDTH as i32 - 2 - place.len() as i32 * CW, 0, BLACK);
+                let lines = self.game.ending_lines();
+                let (x0, y0, x1, _) = Self::box_rect(&lines, (0, 12, WIDTH as i32, 134));
+                for (i, l) in lines.iter().enumerate() {
+                    let w = l.chars().count() as i32 * CW;
+                    let col = if i == 0 { MAGENTA } else { BLACK };
+                    self.text(l, x0 + (x1 - x0 - w) / 2, y0 + 7 + i as i32 * LH, col);
+                }
+                self.text(
+                    "Thanks for playing! Chip's shift starts Thursday.",
+                    2,
+                    PIC_BOTTOM + 3,
+                    LIGHT_GRAY,
+                );
+                if blink {
+                    self.text(
+                        "Press ENTER to return to the title screen.",
+                        2,
+                        PIC_BOTTOM + 13,
+                        YELLOW,
+                    );
+                }
+            }
             Mode::Playing | Mode::Dead => {
                 let score = self.game.score_line();
                 self.text(&score, 2, 0, BLACK);
                 let place = if self.mode == Mode::Dead {
                     "Deceased"
                 } else {
-                    "The Rusty Anchor"
+                    self.game.state.scene.name()
                 };
                 self.text(place, WIDTH as i32 - 2 - place.len() as i32 * CW, 0, BLACK);
                 if self.mode == Mode::Playing {

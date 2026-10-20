@@ -21,6 +21,11 @@ pub enum Verb {
     Flirt,
     Smell,
     Go,
+    Climb,
+    Jump,
+    Wear,
+    Sing,
+    Search,
     Inventory,
     Score,
     Help,
@@ -50,6 +55,48 @@ pub enum Noun {
     Table,
     Floor,
     Me,
+    // Generic words resolved per scene by the game logic.
+    Man,
+    Woman,
+    Machine,
+    // Places (used for typed travel: "go to the casino").
+    Boardwalk,
+    Alley,
+    Store,
+    Casino,
+    Rooftop,
+    // Boardwalk.
+    Dot,
+    Cart,
+    HotDog,
+    Telescope,
+    Ocean,
+    Railing,
+    // Alley.
+    Mime,
+    Dumpster,
+    Grate,
+    FireEscape,
+    Trash,
+    // Store.
+    Brenda,
+    Carnation,
+    Mints,
+    Slushie,
+    Register,
+    // Casino.
+    Tiny,
+    Slots,
+    Elevator,
+    Chandelier,
+    Plant,
+    // Rooftop.
+    Vonda,
+    Piano,
+    Pool,
+    City,
+    // Inventory.
+    Money,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -59,11 +106,20 @@ pub struct Command {
 }
 
 impl Command {
+    pub fn new(verb: Verb, nouns: &[Noun]) -> Command {
+        Command {
+            verb,
+            nouns: nouns.to_vec(),
+        }
+    }
     pub fn noun(&self) -> Option<Noun> {
         self.nouns.first().copied()
     }
     pub fn second(&self) -> Option<Noun> {
         self.nouns.get(1).copied()
+    }
+    pub fn mentions(&self, n: Noun) -> bool {
+        self.nouns.contains(&n)
     }
 }
 
@@ -106,7 +162,6 @@ pub const FILLER: &[&str] = &[
     "then",
     "out",
     "over",
-    "over",
     "under",
     "behind",
     "can",
@@ -135,32 +190,57 @@ pub const FILLER: &[&str] = &[
     "using",
     "by",
     "off",
+    "through",
+    "thru",
+    "onto",
+    "toward",
+    "towards",
+    "back",
+    "nice",
+    "something",
+    "red",
+    "big",
+    "little",
+    "old",
+    "invisible",
+    "lapel",
+    "coin-op",
+    "self",
+    "very",
+    "really",
+    "storm",
 ];
 
 pub fn verb_for(word: &str) -> Option<Verb> {
     use Verb::*;
     Some(match word {
         "look" | "l" | "examine" | "x" | "inspect" | "check" | "view" | "see" | "watch"
-        | "observe" | "describe" | "ogle" => Look,
+        | "observe" | "describe" | "ogle" | "peer" => Look,
         "read" => Read,
         "take" | "get" | "grab" | "pick" | "steal" | "pocket" | "snag" | "nab" => Take,
         "drop" | "discard" | "toss" => Drop,
         "talk" | "speak" | "chat" | "ask" | "greet" | "hello" | "hi" | "hey" | "say" | "tell" => {
             Talk
         }
-        "use" | "insert" | "put" | "push" | "press" => Use,
+        "use" | "insert" | "put" | "push" | "press" | "pull" | "yank" => Use,
         "open" | "unlock" | "enter" => Open,
         "close" | "shut" => Close,
-        "eat" | "taste" | "bite" | "swallow" | "devour" | "nibble" => Eat,
-        "drink" | "sip" | "chug" | "gulp" | "quaff" => Drink,
+        "eat" | "taste" | "bite" | "swallow" | "devour" | "nibble" | "chew" => Eat,
+        "drink" | "sip" | "chug" | "gulp" | "quaff" | "slurp" => Drink,
         "order" | "buy" | "purchase" => Order,
-        "give" | "hand" | "offer" | "pay" | "tip" => Give,
-        "play" | "start" => Play,
+        "give" | "hand" | "offer" | "pay" | "tip" | "feed" => Give,
+        "play" | "start" | "gamble" => Play,
         "sit" => Sit,
         "dance" | "boogie" | "groove" => Dance,
-        "flirt" | "wink" | "smolder" | "woo" | "kiss" => Flirt,
+        "flirt" | "wink" | "smolder" | "woo" | "kiss" | "compliment" | "praise" | "charm"
+        | "flatter" | "sweettalk" | "sweet-talk" => Flirt,
         "smell" | "sniff" => Smell,
-        "walk" | "go" | "leave" | "exit" | "depart" | "run" => Go,
+        "walk" | "go" | "leave" | "exit" | "depart" | "run" | "ride" => Go,
+        "climb" | "scale" => Climb,
+        "jump" | "dive" | "leap" | "swim" | "plunge" => Jump,
+        "wear" | "don" | "pin" | "attach" => Wear,
+        "sing" | "croon" | "serenade" | "perform" | "karaoke" => Sing,
+        "search" | "fish" | "dig" | "rummage" | "reach" => Search,
         "inventory" | "inv" | "i" => Inventory,
         "score" | "points" => Score,
         "help" | "?" | "hint" | "hints" | "commands" => Help,
@@ -175,29 +255,67 @@ pub fn verb_for(word: &str) -> Option<Verb> {
 pub fn noun_for(word: &str) -> Option<Noun> {
     use Noun::*;
     Some(match word {
-        "room" | "bar's" | "place" | "joint" | "dive" | "anchor" | "rusty" => Room,
-        "bartender" | "gus" | "barkeep" | "barman" | "barkeeper" | "man" | "guy" => Bartender,
+        "room" | "place" | "joint" | "dive" | "around" => Room,
+        "bartender" | "gus" | "barkeep" | "barman" | "barkeeper" => Bartender,
+        "man" | "guy" | "dude" | "fellow" | "gentleman" => Man,
+        "woman" | "lady" | "girl" | "gal" | "dame" => Woman,
+        "machine" | "machines" => Machine,
         "jukebox" | "juke" | "music" | "song" | "songs" | "record" | "records" | "box" => Jukebox,
-        "matchbook" | "matches" | "match" | "matchbox" | "book" | "number" | "phone" => Matchbook,
-        "quarter" | "coin" | "money" | "change" | "cash" | "25" => Quarter,
+        "matchbook" | "matches" | "match" | "matchbox" | "book" | "number" | "phone" | "note" => {
+            Matchbook
+        }
+        "quarter" | "coin" | "change" => Quarter,
+        "money" | "cash" | "bill" | "fiver" | "dollars" | "dollar" | "bucks" | "buck" | "five" => {
+            Money
+        }
         "comb" | "hair" | "pompadour" => Comb,
         "egg" | "eggs" | "jar" | "pickled" => Egg,
-        "drink" | "drinks" | "beer" | "booze" | "cocktail" | "special" | "bilge" | "water"
-        | "glass" | "liquor" => Drink,
-        "bar" | "counter" | "bartop" => Bar,
+        "drink" | "drinks" | "beer" | "booze" | "cocktail" | "special" | "bilge" | "glass"
+        | "liquor" => Drink,
+        "bar" | "counter" | "bartop" | "anchor" | "rusty" => Bar,
         "stool" | "stools" | "seat" | "barstool" => Stool,
-        "door" | "street" | "outside" | "boardwalk" => Door,
+        "door" | "doors" | "exit" | "entrance" => Door,
         "restroom" | "bathroom" | "toilet" | "loo" | "wc" | "lavatory" | "mens" | "john" => {
             Restroom
         }
-        "sign" | "neon" | "light" | "lights" => Sign,
-        "bottles" | "bottle" | "shelf" | "shelves" | "mirror" => Bottles,
-        "patron" | "drunk" | "regular" | "sailor" | "barfly" | "captain" | "customer" | "hat" => {
-            Patron
-        }
+        "sign" | "neon" | "light" | "lights" | "marquee" => Sign,
+        "bottles" | "bottle" | "shelf" | "shelves" | "mirror" | "aisle" | "products" => Bottles,
+        "patron" | "drunk" | "regular" | "sailor" | "captain" | "customer" | "hat" => Patron,
         "table" => Table,
-        "floor" | "puddle" | "ground" => Floor,
-        "me" | "self" | "myself" | "chip" | "tux" | "tuxedo" | "suit" | "clothes" => Me,
+        "floor" | "puddle" | "ground" | "carpet" | "planks" | "deck" => Floor,
+        "me" | "myself" | "chip" | "tux" | "tuxedo" | "suit" | "clothes" => Me,
+        "boardwalk" | "street" | "outside" | "promenade" => Boardwalk,
+        "alley" | "alleyway" => Alley,
+        "store" | "shop" | "mart" | "market" | "gull" | "lucky" => Store,
+        "casino" | "clam" | "golden" | "lobby" => Casino,
+        "roof" | "rooftop" | "lounge" | "nest" | "crow's" | "crows" | "upstairs" => Rooftop,
+        "dot" | "vendor" | "skates" => Dot,
+        "cart" | "stand" | "umbrella" => Cart,
+        "hotdog" | "hot" | "dog" | "frank" | "wiener" | "sausage" => HotDog,
+        "telescope" | "scope" | "binoculars" | "viewer" | "eyepiece" => Telescope,
+        "ocean" | "sea" | "beach" | "waves" | "surf" | "pier" => Ocean,
+        "railing" | "rail" | "edge" | "ledge" => Railing,
+        "mime" | "gerard" | "performer" => Mime,
+        "dumpster" | "bin" => Dumpster,
+        "grate" | "drain" | "sewer" | "grating" | "bars" => Grate,
+        "fire" | "escape" | "ladder" | "stairs" => FireEscape,
+        "trash" | "garbage" | "bags" | "bag" | "cans" => Trash,
+        "brenda" | "clerk" | "cashier" | "teen" | "teenager" => Brenda,
+        "carnation" | "carnations" | "flower" | "flowers" | "rose" | "roses" | "bucket" => {
+            Carnation
+        }
+        "mints" | "mint" | "breath" | "tin" => Mints,
+        "slushie" | "slushy" | "slush" | "slushies" => Slushie,
+        "register" | "till" | "magazine" => Register,
+        "tiny" | "doorman" | "bouncer" | "giant" => Tiny,
+        "slot" | "slots" | "lever" | "jackpot" | "bandit" => Slots,
+        "elevator" | "lift" => Elevator,
+        "chandelier" | "crystal" => Chandelier,
+        "plant" | "palm" | "fern" | "tree" => Plant,
+        "vonda" | "singer" | "diva" | "sweetheart" => Vonda,
+        "piano" | "keys" | "pianist" => Piano,
+        "pool" | "swimming" => Pool,
+        "city" | "skyline" | "view" | "stars" | "sky" | "moon" => City,
         _ => return None,
     })
 }
@@ -282,6 +400,7 @@ mod tests {
         assert_eq!(parse("x jukebox"), cmd(Verb::Look, &[Noun::Jukebox]));
         assert_eq!(parse("grab matches"), cmd(Verb::Take, &[Noun::Matchbook]));
         assert_eq!(parse("get coin"), cmd(Verb::Take, &[Noun::Quarter]));
+        assert_eq!(parse("get the money"), cmd(Verb::Take, &[Noun::Money]));
         assert_eq!(parse("i"), cmd(Verb::Inventory, &[]));
         assert_eq!(parse("inv"), cmd(Verb::Inventory, &[]));
         assert_eq!(parse("load"), cmd(Verb::Restore, &[]));
@@ -332,6 +451,54 @@ mod tests {
         assert_eq!(parse("drink the drink"), cmd(Verb::Drink, &[Noun::Drink]));
         assert_eq!(parse("order a drink"), cmd(Verb::Order, &[Noun::Drink]));
         assert_eq!(parse("eat pickled egg"), cmd(Verb::Eat, &[Noun::Egg]));
+    }
+
+    #[test]
+    fn milestone2_vocabulary() {
+        assert_eq!(
+            parse("give the hot dog to the mime"),
+            cmd(Verb::Give, &[Noun::HotDog, Noun::Mime])
+        );
+        assert_eq!(parse("feed mime"), cmd(Verb::Give, &[Noun::Mime]));
+        assert_eq!(
+            parse("use comb on the storm drain"),
+            cmd(Verb::Use, &[Noun::Comb, Noun::Grate])
+        );
+        assert_eq!(
+            parse("use comb on drain"),
+            cmd(Verb::Use, &[Noun::Comb, Noun::Grate])
+        );
+        assert_eq!(
+            parse("buy a red carnation"),
+            cmd(Verb::Order, &[Noun::Carnation])
+        );
+        assert_eq!(
+            parse("wear the carnation"),
+            cmd(Verb::Wear, &[Noun::Carnation])
+        );
+        assert_eq!(
+            parse("pin flower on lapel"),
+            cmd(Verb::Wear, &[Noun::Carnation])
+        );
+        assert_eq!(
+            parse("look through the telescope"),
+            cmd(Verb::Look, &[Noun::Telescope])
+        );
+        assert_eq!(parse("dive into the pool"), cmd(Verb::Jump, &[Noun::Pool]));
+        assert_eq!(
+            parse("climb into dumpster"),
+            cmd(Verb::Climb, &[Noun::Dumpster])
+        );
+        assert_eq!(parse("go to the casino"), cmd(Verb::Go, &[Noun::Casino]));
+        assert_eq!(parse("enter store"), cmd(Verb::Open, &[Noun::Store]));
+        assert_eq!(parse("compliment dot"), cmd(Verb::Flirt, &[Noun::Dot]));
+        assert_eq!(parse("sing with vonda"), cmd(Verb::Sing, &[Noun::Vonda]));
+        assert_eq!(
+            parse("play slot machine"),
+            cmd(Verb::Play, &[Noun::Slots, Noun::Machine])
+        );
+        assert_eq!(parse("talk to the woman"), cmd(Verb::Talk, &[Noun::Woman]));
+        assert_eq!(parse("ride the elevator"), cmd(Verb::Go, &[Noun::Elevator]));
     }
 
     #[test]
