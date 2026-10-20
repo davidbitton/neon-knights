@@ -20,10 +20,9 @@ use crate::game::logic::{Death, Effect, HELP, INTRO};
 use crate::game::scene::{self, PIC_BOTTOM, STATUS_H};
 use crate::game::state::{GameState, START_POS};
 use crate::game::text::wrap;
-use crate::game::Game;
+use crate::game::{Game, LEGACY_SAVE_KEYS, SAVE_KEY, SUBTITLE, TITLE};
 
 const SCALE: f64 = 3.0;
-const SAVE_KEY: &str = "neon-nights.save.v1";
 const TICK_MS: f64 = 50.0;
 /// Text cell size in framebuffer pixels.
 const CW: i32 = 6;
@@ -89,6 +88,24 @@ fn window() -> Window {
 
 fn storage() -> Option<Storage> {
     window().local_storage().ok().flatten()
+}
+
+/// Read the save slot, migrating a save left under a legacy key (from when
+/// the game was called "Neon Nights") to the current key.
+fn load_save() -> Option<String> {
+    let s = storage()?;
+    if let Some(d) = s.get_item(SAVE_KEY).ok().flatten() {
+        return Some(d);
+    }
+    for old in LEGACY_SAVE_KEYS {
+        if let Some(d) = s.get_item(old).ok().flatten() {
+            if s.set_item(SAVE_KEY, &d).is_ok() {
+                let _ = s.remove_item(old);
+            }
+            return Some(d);
+        }
+    }
+    None
 }
 
 fn ctx2d(c: &HtmlCanvasElement) -> Result<CanvasRenderingContext2d, JsValue> {
@@ -184,7 +201,7 @@ impl App {
     }
 
     fn restore(&mut self) {
-        let data = storage().and_then(|s| s.get_item(SAVE_KEY).ok().flatten());
+        let data = load_save();
         match data.map(|d| GameState::deserialize(&d)) {
             Some(Ok(st)) => {
                 self.hero = Actor::new(st.hero.0, st.hero.1);
@@ -196,7 +213,7 @@ impl App {
                 self.last_cmd = None;
                 self.input.clear();
                 self.queue.clear();
-                self.queue.push_back("Game restored. Previously, on Neon Nights...".into());
+                self.queue.push_back(format!("Game restored. Previously, on {TITLE}..."));
             }
             Some(Err(_)) => self.queue.push_back("That saved game is corrupted. Much like this town.".into()),
             None => self
@@ -539,11 +556,11 @@ impl App {
                 hi.set_shadow_blur(24.0);
                 hi.set_font("bold 96px 'DejaVu Sans Mono', monospace");
                 hi.set_fill_style_str(&palette::css(LIGHT_MAGENTA));
-                hi.fill_text("NEON NIGHTS", 480.0, 120.0)?;
+                hi.fill_text(&TITLE.to_uppercase(), 480.0, 120.0)?;
                 hi.set_shadow_color("#55ffff");
                 hi.set_font("bold 34px 'DejaVu Sans Mono', monospace");
                 hi.set_fill_style_str(&palette::css(LIGHT_CYAN));
-                hi.fill_text("A Gentleman's Evening Out", 480.0, 230.0)?;
+                hi.fill_text(SUBTITLE, 480.0, 230.0)?;
                 hi.set_shadow_blur(0.0);
                 hi.set_font(&self.font);
                 hi.set_fill_style_str(&palette::css(WHITE));
@@ -559,7 +576,7 @@ impl App {
                 hi.fill_rect(0.0, 0.0, 960.0, 600.0);
                 hi.set_text_align("center");
                 hi.set_fill_style_str(&palette::css(LIGHT_MAGENTA));
-                hi.fill_text("Thanks for playing Neon Nights!", 480.0, 220.0)?;
+                hi.fill_text(&format!("Thanks for playing {TITLE}!"), 480.0, 220.0)?;
                 hi.set_fill_style_str(&palette::css(WHITE));
                 hi.fill_text(
                     "Chip will be at the Rusty Anchor. He's always there.",

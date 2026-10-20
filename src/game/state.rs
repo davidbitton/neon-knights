@@ -3,6 +3,13 @@
 pub const MAX_SCORE: u32 = 20;
 pub const SAVE_MAGIC: &str = "NN1";
 
+/// localStorage key for the single save slot.
+pub const SAVE_KEY: &str = "neon-knights.save.v1";
+/// Keys used by earlier builds (the game was briefly called "Neon Nights").
+/// Saves found under these are migrated to [`SAVE_KEY`] on restore. The save
+/// format itself (`NN1|...`) is unchanged.
+pub const LEGACY_SAVE_KEYS: &[&str] = &["neon-nights.save.v1"];
+
 /// Hero start position (feet) in the Rusty Anchor.
 pub const START_POS: (i32, i32) = (40, 150);
 
@@ -232,6 +239,12 @@ mod tests {
         let text = s.serialize();
         assert!(text.starts_with("NN1|"));
         assert_eq!(GameState::deserialize(&text), Ok(s));
+    }
+
+    #[test]
+    fn save_keys_use_current_name() {
+        assert!(SAVE_KEY.starts_with("neon-knights."));
+        assert!(!LEGACY_SAVE_KEYS.contains(&SAVE_KEY));
     }
 
     #[test]

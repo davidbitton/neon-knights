@@ -1,4 +1,4 @@
-//! Neon Nights: A Gentleman's Evening Out.
+//! Neon Knights: A Gentleman's Evening Out.
 //!
 //! An original parody adventure in the style of late-1980s parser-driven
 //! adventure games. The crate is split into:

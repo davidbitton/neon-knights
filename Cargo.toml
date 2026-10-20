@@ -1,9 +1,10 @@
 [package]
-name = "neon-nights"
+name = "neon-knights"
 version = "0.1.0"
 edition = "2021"
-description = "Neon Nights: A Gentleman's Evening Out - an original parody adventure in the style of late-1980s parser adventures"
+description = "Neon Knights: A Gentleman's Evening Out - an original parody adventure in the style of late-1980s parser adventures"
 license = "MIT"
+repository = "https://github.com/davidbitton/neon-knights"
 publish = false
 
 [lib]

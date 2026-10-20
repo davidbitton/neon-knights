@@ -1,8 +1,8 @@
-import asyncio, sys
+import asyncio, os, sys
 from playwright.async_api import async_playwright
 
 URL = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8765/"
-OUT = "/workspace/neon-nights-shots"
+OUT = os.environ.get("SHOTS_DIR", "/workspace/neon-nights-shots")
 
 async def main():
     logs, errors = [], []
@@ -83,8 +83,22 @@ async def main():
         await ok()
         await cmd("quit")
         await shot("12-quit")
-        state = await page.evaluate("localStorage.getItem('neon-nights.save.v1')")
+        state = await page.evaluate("localStorage.getItem('neon-knights.save.v1')")
         print("save:", state)
+        # Legacy-key migration: a save left by a "Neon Nights" build must restore.
+        await page.evaluate("""() => {
+            localStorage.removeItem('neon-knights.save.v1');
+            localStorage.setItem('neon-nights.save.v1', 'NN1|13|7|cmd|236|112|9|0|0');
+        }""")
+        await page.reload(); await page.wait_for_timeout(1500)
+        await page.keyboard.press("Enter"); await page.wait_for_timeout(300)
+        await ok()
+        await cmd("restore")
+        await shot("13-legacy-save-restored")
+        keys = await page.evaluate("[localStorage.getItem('neon-knights.save.v1'), localStorage.getItem('neon-nights.save.v1')]")
+        print("after migration [new, old]:", keys)
+        title = await page.title()
+        print("title:", title)
         await b.close()
     print("console:", *logs, sep="\n  ")
     print("pageerrors:", errors)

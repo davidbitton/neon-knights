@@ -1,11 +1,13 @@
-# Neon Nights: A Gentleman's Evening Out
+# Neon Knights: A Gentleman's Evening Out
+
+Repository: https://github.com/davidbitton/neon-knights
 
 A tiny browser adventure game written in plain Rust and compiled to
 WebAssembly. Chip Valentine, a cheesy guy in a powder-blue tuxedo, spends one
 night in Ocean Bluffs, a run-down beach town. Milestone 1 contains a single
 fully playable scene: **The Rusty Anchor**, a dive bar.
 
-> **Neon Nights is an original parody/homage** in the style of the late-1980s
+> **Neon Knights is an original parody/homage** in the style of the late-1980s
 > Sierra-style parser adventures (16-color EGA graphics, a typed command line,
 > a status bar with your score, and comedic deaths). All characters, story,
 > writing, art and code are original. **No Sierra assets, characters, names,
@@ -25,11 +27,18 @@ fully playable scene: **The Rusty Anchor**, a dive bar.
   Look verb runs `look bartender`). **Right-click or Tab** cycles the verb
   (Walk / Look / Take / Talk / Use). Non-look verbs walk Chip over first.
 * Message boxes pause the game: press Enter, Esc, Space or click to dismiss.
-* The game saves to one `localStorage` slot.
+* The game saves to one `localStorage` slot (`neon-knights.save.v1`). Saves made
+  by early builds under the old working title "Neon Nights"
+  (`neon-nights.save.v1`) are picked up and migrated automatically on restore.
 
 There are 20 points in the Rusty Anchor, and at least one way to die.
 
 ## Building
+
+```sh
+git clone https://github.com/davidbitton/neon-knights.git
+cd neon-knights
+```
 
 Requirements: Rust (stable, via rustup), the `wasm32-unknown-unknown` target,
 and [trunk](https://trunkrs.dev). Trunk downloads matching `wasm-bindgen` and
@@ -46,7 +55,8 @@ cd dist && python3 -m http.server 8080   # then open http://localhost:8080
 ```
 
 Optional browser smoke test (Playwright, Chromium) that plays through the
-scene and writes screenshots to `/workspace/neon-nights-shots/`:
+scene and writes screenshots (default `/workspace/neon-nights-shots/`, override
+with `SHOTS_DIR`):
 
 ```sh
 pip install playwright && playwright install chromium
