@@ -1,0 +1,29 @@
+[package]
+name = "neon-nights"
+version = "0.1.0"
+edition = "2021"
+description = "Neon Nights: A Gentleman's Evening Out - an original parody adventure in the style of late-1980s parser adventures"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = [
+  "Window", "Document", "Element", "HtmlElement", "HtmlCanvasElement",
+  "CanvasRenderingContext2d", "ImageData", "KeyboardEvent", "MouseEvent",
+  "WheelEvent", "Event", "EventTarget", "Storage", "DomRect", "Performance",
+  "TextMetrics", "console",
+] }
+console_error_panic_hook = "0.1"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
