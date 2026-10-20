@@ -1,6 +1,7 @@
 # Neon Knights: A Gentleman's Evening Out
 
 [![Rust](https://github.com/davidbitton/neon-knights/actions/workflows/rust.yml/badge.svg)](https://github.com/davidbitton/neon-knights/actions/workflows/rust.yml)
+[![UI tests](https://github.com/davidbitton/neon-knights/actions/workflows/ui.yml/badge.svg)](https://github.com/davidbitton/neon-knights/actions/workflows/ui.yml)
 [![Pages](https://github.com/davidbitton/neon-knights/actions/workflows/pages.yml/badge.svg)](https://github.com/davidbitton/neon-knights/actions/workflows/pages.yml)
 
 **[Play it in your browser: https://davidbitton.github.io/neon-knights/](https://davidbitton.github.io/neon-knights/)**
@@ -70,6 +71,11 @@ Stuck? [WALKTHROUGH.md](WALKTHROUGH.md) has the full solution (spoilers!).
   extended. On every push and pull request to `main` it runs on a pinned
   toolchain: `cargo fmt --check`, build, tests, clippy (native and
   `wasm32-unknown-unknown`, with `-D warnings`) and a release wasm32 build.
+* `.github/workflows/ui.yml` ("UI tests") runs on every push and pull
+  request to `main`. It builds the game with trunk, installs pinned
+  Playwright + Chromium (cached), and runs the browser test suite below. If
+  anything fails, it uploads the visual diffs and failure screenshots as the
+  `ui-test-results` artifact.
 * `.github/workflows/pages.yml` ("Pages") runs on every push to `main` (or
   by hand). It builds the site with
   `trunk build --release --public-url /neon-knights/` and deploys it to
@@ -97,23 +103,63 @@ trunk build --release      # production build into dist/
 cd dist && python3 -m http.server 8080   # then open http://localhost:8080
 ```
 
-There's an optional browser smoke test (Playwright, Chromium). It plays the
-whole game from the title screen to the ending, dies once along the way, and
-writes screenshots (default `/workspace/neon-nights-shots/`, override
-with `SHOTS_DIR`):
+## Testing
+
+**Native tests** (`cargo test`) cover the engine, the parser, every scene's
+rules, a full walkthrough to 60/60, every death, save compatibility,
+path-finding, the font and the tunes.
+
+**Browser UI tests** (`tests/ui/`, pytest + Playwright, Chromium) drive the
+real game in a headless browser:
+
+* *Functional* tests (`test_game.py`) use real keyboard and mouse input:
+  - a full mouse-and-keyboard playthrough to 60/60
+  - every death, plus the tombstone's Restore button and N key
+  - save/restore, including migration of the legacy save key
+  - the ending's buttons and keys
+  - audio: the AudioContext only after a user gesture, and the beeps for
+    each sound effect
+  - mute (M key and `sound on`/`sound off`) persisting across reloads
+* *Visual regression* tests (`test_visual.py`) compare key frames: the
+  title, all six scenes, a message box, a parser error, a death screen and
+  the ending.
+
+  They compare the game's own 320x200 framebuffer, read out as palette
+  indices, against PNG baselines in `tests/visual/baseline/`. They don't use
+  page screenshots, so fonts, GPU and OS rendering can't change the result.
+  By default a single differing pixel fails the test
+  (`VISUAL_MAX_DIFF_PIXELS=0`; `VISUAL_COLOR_TOLERANCE=8` per channel).
+  On failure, `tests/visual/output/` gets `<name>-actual.png` and
+  `<name>-diff.png` (baseline | actual | changes in red, ringed in yellow).
+
+The tests are deterministic. They open the game with `?test`, which stops
+the game clock, so time only advances when a test calls the
+wasm-exported `test_step` / `test_until_idle` hooks. They read game state
+(`test_state`) and pixels (`test_framebuffer`) through those hooks too.
+There are no fixed sleeps. The stars and all text rotation in the game are
+already seeded or deterministic. Any console error or warning, or any
+uncaught page error, fails the test.
 
 ```sh
-pip install playwright && playwright install chromium
-python3 tools/smoke_test.py http://localhost:8080/
+python3 -m venv .venv && . .venv/bin/activate
+pip install -r tests/requirements.txt          # pinned versions
+python -m playwright install --with-deps chromium
+
+trunk build --release
+python -m pytest tests/ui                      # serves dist/ on a free port
+
+# Update the visual baselines on purpose after an intended art/text change,
+# then review and commit tests/visual/baseline/*.png:
+UPDATE_SNAPSHOTS=1 python -m pytest tests/ui -k visual
 ```
 
-To check the GitHub Pages build locally, build it under the project subpath
-and serve it from a matching directory:
+To run against another server, set `NK_BASE_URL`. For example, to check the
+GitHub Pages build under its project subpath:
 
 ```sh
 trunk build --release --public-url /neon-knights/ --dist /tmp/site/neon-knights
 (cd /tmp/site && python3 -m http.server 8081 &)
-python3 tools/smoke_test.py http://localhost:8081/neon-knights/
+NK_BASE_URL=http://localhost:8081/neon-knights/ python -m pytest tests/ui
 ```
 
 ## Layout
@@ -143,8 +189,9 @@ src/
     text.rs         word wrap and message pagination
   web.rs            wasm-bindgen/web-sys front-end: canvas, input, UI, Web Audio, localStorage
 index.html          trunk entry point; nearest-neighbor scaled canvas
-tools/smoke_test.py headless-browser smoke test
-.github/workflows/  CI (rust.yml) and GitHub Pages deployment (pages.yml)
+tests/ui/           browser UI tests (pytest + Playwright): functional + visual
+tests/visual/baseline/  committed framebuffer baselines for the visual tests
+.github/workflows/  CI (rust.yml), UI tests (ui.yml), GitHub Pages (pages.yml)
 ```
 
 How rendering works: every frame the scene's *visual* plane is copied into an
