@@ -7,4 +7,5 @@
 pub mod actor;
 pub mod gfx;
 pub mod palette;
+pub mod path;
 pub mod sprite;

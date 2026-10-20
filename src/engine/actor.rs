@@ -15,6 +15,8 @@ pub enum Motion {
     Heading(Dir),
     /// Walk toward a point.
     Target(i32, i32),
+    /// Follow `Actor::path`.
+    Path,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -25,6 +27,8 @@ pub struct Actor {
     pub dir: Dir,
     pub frame: u8,
     pub motion: Motion,
+    /// Remaining steps when following a path (next step last).
+    path: Vec<(i32, i32)>,
 }
 
 /// Half-width of the hero's footprint used for collision.
@@ -42,6 +46,7 @@ impl Actor {
             dir: Dir::Down,
             frame: 0,
             motion: Motion::Idle,
+            path: Vec::new(),
         }
     }
 
@@ -51,6 +56,7 @@ impl Actor {
 
     pub fn stop(&mut self) {
         self.motion = Motion::Idle;
+        self.path.clear();
         self.frame = 0;
     }
 
@@ -66,7 +72,19 @@ impl Actor {
     }
 
     pub fn walk_to(&mut self, x: i32, y: i32) {
+        self.path.clear();
         self.motion = Motion::Target(x, y);
+    }
+
+    /// Follow a route of single steps (from `path::find_path`).
+    pub fn follow(&mut self, steps: Vec<(i32, i32)>) {
+        self.path = steps;
+        self.path.reverse();
+        self.motion = if self.path.is_empty() {
+            Motion::Idle
+        } else {
+            Motion::Path
+        };
     }
 
     fn try_move(&mut self, pic: &Picture, dx: i32, dy: i32) -> bool {
@@ -96,6 +114,27 @@ impl Actor {
                 }
                 ok
             }
+            Motion::Path => match self.path.pop() {
+                Some((nx, ny)) if can_stand(pic, nx, ny) => {
+                    let (dx, dy) = (nx - self.x, ny - self.y);
+                    // Keep facing steady on diagonal stair-steps.
+                    if dx != 0 && (dy == 0 || self.dir == Dir::Left || self.dir == Dir::Right) {
+                        self.dir = if dx > 0 { Dir::Right } else { Dir::Left };
+                    } else if dy != 0 && dx == 0 {
+                        self.dir = if dy > 0 { Dir::Down } else { Dir::Up };
+                    }
+                    self.x = nx;
+                    self.y = ny;
+                    if self.path.is_empty() {
+                        self.motion = Motion::Idle;
+                    }
+                    true
+                }
+                _ => {
+                    self.stop();
+                    false
+                }
+            },
             Motion::Target(tx, ty) => {
                 let ddx = tx - self.x;
                 let ddy = ty - self.y;

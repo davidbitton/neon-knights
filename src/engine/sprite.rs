@@ -27,6 +27,10 @@ pub fn color_key(ch: char) -> Option<u8> {
         'Y' => Some(YELLOW),
         'G' => Some(GREEN),
         'M' => Some(LIGHT_MAGENTA),
+        'm' => Some(MAGENTA),
+        'g' => Some(LIGHT_GREEN),
+        'u' => Some(LIGHT_BLUE),
+        'C' => Some(CYAN),
         _ => None,
     }
 }
