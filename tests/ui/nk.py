@@ -16,15 +16,19 @@ from PIL import Image
 W, H = 320, 200
 VERBS = ["Walk", "Look", "Take", "Talk", "Use"]
 
-# Mirrors of the save format in src/game/state.rs (NN2 records).
-SCENES = ["Bar", "Boardwalk", "Alley", "Store", "Casino", "Rooftop"]
+# Mirrors of the save format in src/game/state.rs (NN3 records; NN2 and NN1
+# are still readable, see Save.encode_nn2).
+SCENES = ["Bar", "Boardwalk", "Alley", "Store", "Casino", "Rooftop", "Pier", "Laundromat", "Motel"]
+HINT_SLOTS = 24
 FLAG_BITS = {
     name: i
     for i, name in enumerate(
         "TookMatchbook ReadMatchbook PlayedJukebox GotDrink DrankDrink EggWarned "
         "SatOnStool SeenIntro VisitedBoardwalk VisitedAlley VisitedStore VisitedCasino "
         "VisitedRooftop GotHotDog UsedTelescope MimeFed GotFiver BoughtCarnation "
-        "BoughtMints WearingCarnation TinyApproved AteMints Won".split()
+        "BoughtMints WearingCarnation TinyApproved AteMints Won "
+        "Sang GotTicket DeeBriefed GotRod GotShrimp CaughtFlounder GotKey GotGown "
+        "VisitedPier VisitedLaundromat VisitedMotel DryerOpen FerrisAway".split()
     )
 }
 
@@ -48,7 +52,7 @@ AUDIO_PROBE = """
 
 @dataclass
 class Save:
-    """Build an NN2 save record to jump straight to a point in the game."""
+    """Build a save record to jump straight to a point in the game."""
 
     scene: str
     score: int
@@ -57,12 +61,28 @@ class Save:
     cash: int = 0
     hero: tuple[int, int] = (40, 150)
 
-    def encode(self) -> str:
+    def _bits(self) -> int:
         bits = 0
         for f in self.flags:
             bits |= 1 << FLAG_BITS[f]
+        return bits
+
+    def encode(self) -> str:
+        """The current NN3 format: nine talk counters and 24 hint digits."""
         x, y = self.hero
-        return f"NN2|{SCENES.index(self.scene)}|{self.score}|{bits}|{self.inv}|{self.cash}|{x}|{y}|1|0,0,0,0,0,0|0"
+        talks = ",".join(["0"] * 9)
+        return (
+            f"NN3|{SCENES.index(self.scene)}|{self.score}|{self._bits()}|{self.inv}|{self.cash}"
+            f"|{x}|{y}|1|{talks}|0|{'0' * HINT_SLOTS}"
+        )
+
+    def encode_nn2(self) -> str:
+        """The Milestone 3 format (six talk counters, no hints), for load tests."""
+        x, y = self.hero
+        return (
+            f"NN2|{SCENES.index(self.scene)}|{self.score}|{self._bits()}|{self.inv}|{self.cash}"
+            f"|{x}|{y}|1|0,0,0,0,0,0|0"
+        )
 
 
 BAR_DONE = ["TookMatchbook", "ReadMatchbook", "PlayedJukebox", "GotDrink", "DrankDrink", "SeenIntro", "VisitedBoardwalk"]
@@ -88,6 +108,30 @@ SAVES = {
         "cmfn", 0, (154, 112),
     ),
 }
+
+
+def pelican_x(ticks: int) -> int:
+    """Percival's x on the pier (mirrors world::pier::pelican_pos)."""
+    span, pace, x0 = 110, 6, 122
+    t = (ticks // pace) % (2 * span)
+    return x0 + (t if t < span else 2 * span - t)
+
+
+_SANG = SAVES["rooftop"].flags + ["AteMints", "Sang", "GotTicket"]
+_CHAIN = ["DeeBriefed", "GotRod", "GotShrimp", "FerrisAway", "VisitedPier", "VisitedLaundromat", "VisitedMotel"]
+SAVES.update(
+    {
+        # Just sang for the ticket (62/80); the pier chain is all ahead.
+        "sang": Save("Rooftop", 62, _SANG, "cmft", 0, (124, 134)),
+        "laundromat": Save("Laundromat", 62, _SANG + ["VisitedLaundromat"], "cmft", 0, (300, 140)),
+        "pier": Save("Pier", 66, _SANG + ["DeeBriefed", "GotRod", "VisitedLaundromat", "VisitedPier"], "cmfr", 0, (16, 128)),
+        "motel": Save("Motel", 66, _SANG + ["DeeBriefed", "GotRod", "VisitedLaundromat", "VisitedPier", "VisitedMotel"], "cmfr", 0, (16, 128)),
+        # Key in hand, dryer still locked (75/80).
+        "dryer": Save("Laundromat", 75, _SANG + _CHAIN + ["CaughtFlounder", "GotKey"], "cmfrk", 0, (300, 140)),
+        # Gown in hand, one step from the ending (78/80).
+        "gown": Save("Rooftop", 78, _SANG + _CHAIN + ["CaughtFlounder", "GotKey", "DryerOpen", "GotGown"], "cmfrkg", 0, (124, 134)),
+    }
+)
 
 
 class Game:
@@ -172,6 +216,16 @@ class Game:
 
     def walk(self, x: int, y: int) -> dict:
         return self.act("Walk", x, y)
+
+    def travel(self, *places: str) -> list[str]:
+        """Type "go to <place>" for each place in turn, walking to the exit
+        each time; returns the arrival messages (dismissed)."""
+        out = []
+        for p in places:
+            self.type(f"go to {p}")
+            self.until_idle()
+            out += self.messages()
+        return out
 
     # ------------------------------------------------------------ flows
     def start(self) -> list[str]:

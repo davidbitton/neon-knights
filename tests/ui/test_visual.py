@@ -91,7 +91,7 @@ def test_visual_parser_error(game: Game):
     check_frame("parser-error", game.frame())
 
 
-@pytest.mark.parametrize("scene", ["boardwalk", "alley", "store", "casino", "rooftop"])
+@pytest.mark.parametrize("scene", ["boardwalk", "alley", "store", "casino", "rooftop", "pier", "laundromat", "motel"])
 def test_visual_scene(game: Game, scene: str):
     st = game.restore(SAVES[scene])
     assert st["scene"].lower() == scene
@@ -108,9 +108,25 @@ def test_visual_death(game: Game):
     check_frame("death-slushie", game.frame())
 
 
+@pytest.mark.parametrize(
+    "name,save,spot,cmd",
+    [
+        ("dryer", Save("Laundromat", 78, SAVES["dryer"].flags + ["DryerOpen", "GotGown"], "cmfrg", 0, (300, 140)), (263, 108), "climb into dryer"),
+        ("shrimp", Save("Motel", 66, SAVES["motel"].flags + ["FerrisAway"], "cmfr", 0, (16, 128)), (74, 120), "eat shrimp"),
+    ],
+)
+def test_visual_new_deaths(game: Game, name, save, spot, cmd):
+    game.restore(save)
+    game.walk(*spot)
+    game.type(cmd)
+    game.messages()
+    assert game.state()["mode"] == "Dead"
+    check_frame(f"death-{name}", game.frame())
+
+
 def test_visual_ending(game: Game):
-    game.restore(Save("Rooftop", 50, SAVES["rooftop"].flags + ["AteMints"], "cmf", 0, (124, 134)))
-    game.type("sing to vonda")
+    game.restore(SAVES["gown"])
+    game.type("give gown to vonda")
     game.messages()
     assert game.state()["mode"] == "Ending"
     check_frame("ending", game.frame())
