@@ -7,6 +7,10 @@ mod alley;
 mod bar;
 mod boardwalk;
 mod casino;
+mod hints;
+mod laundromat;
+mod motel;
+mod pier;
 mod rooftop;
 mod store;
 #[cfg(test)]
@@ -102,7 +106,11 @@ pub(crate) fn near(s: &GameState, n: Noun) -> bool {
 
 pub const INTRO: &str = "Ocean Bluffs, 11:42 PM. The tide is out, the rent is due, and Chip Valentine has squeezed into his lucky powder-blue tuxedo for one perfect night on the town.\n\nHis first stop: The Rusty Anchor, a bar so dingy the cockroaches wipe their feet on the way OUT.";
 
-pub const HELP: &str = "Type commands like LOOK, LOOK AT BARTENDER, TAKE MATCHBOOK, TALK TO GUS, USE QUARTER ON JUKEBOX, GIVE HOT DOG TO MIME, BUY CARNATION, INVENTORY (or I), SCORE, SAVE, RESTORE, RESTART, SOUND ON / SOUND OFF.\n\nArrow keys walk (press again to stop). Click to walk. Walk off a screen edge or into a doorway to go places, or type GO TO CASINO, ENTER STORE, LEAVE. Click a thing to use the current verb on it; right-click (or Tab) changes the verb. When you're not typing (title, message boxes, tombstones), M toggles sound.";
+pub const HELP: &str = "Type commands like LOOK, LOOK AT BARTENDER, TAKE MATCHBOOK, TALK TO GUS, USE QUARTER ON JUKEBOX, GIVE HOT DOG TO MIME, BUY CARNATION, INVENTORY (or I), SCORE, SAVE, RESTORE, RESTART, SOUND ON / SOUND OFF.
+
+Stuck? Type HINT for a nudge (ask again for a bigger one), or VERBS for a list of words Chip understands.\n\nArrow keys walk (press again to stop). Click to walk. Walk off a screen edge or into a doorway to go places, or type GO TO CASINO, ENTER STORE, LEAVE. Click a thing to use the current verb on it; right-click (or Tab) changes the verb. When you're not typing (title, message boxes, tombstones), M toggles sound.";
+
+pub const VERBS: &str = "Chip understands these verbs (and a lot of synonyms for them): LOOK, READ, TAKE, DROP, TALK, USE, GIVE, OPEN, CLOSE, EAT, DRINK, ORDER or BUY, PLAY, SIT, DANCE, FLIRT or COMPLIMENT, SMELL, GO or ENTER, CLIMB, JUMP, WEAR, SING, SEARCH.\n\nMeta words: INVENTORY (I), SCORE, HINT, VERBS, HELP, SAVE, RESTORE, RESTART, QUIT, SOUND ON / OFF.\n\nCombine a verb with up to two things, like USE QUARTER ON JUKEBOX or GIVE HOT DOG TO MIME.";
 
 pub const SOUND_ON: &str = "Sound on. Your PC speaker clears its throat and stands ready to beep.";
 pub const SOUND_OFF: &str = "Sound off. Silence is golden, like Chip's cufflinks. Well, gold-tone.";
@@ -205,6 +213,28 @@ pub fn death(kind: DeathKind) -> Death {
                 "So, in the end, was Chip.",
             ],
         ),
+        DeathKind::Dryer => (
+            "Tumble dried on high",
+            &[
+                "HERE LIES CHIP VALENTINE",
+                "He wanted to feel like a gown.",
+                "He came out a size small.",
+                "",
+                "Dry clean only.",
+                "Permanent press.",
+            ],
+        ),
+        DeathKind::Shrimp => (
+            "Complimentary shrimp",
+            &[
+                "HERE LIES CHIP VALENTINE",
+                "He tried the shrimp.",
+                "The shrimp tried back.",
+                "",
+                "Best by 1983.",
+                "Guests only.",
+            ],
+        ),
     };
     Death {
         kind,
@@ -233,6 +263,12 @@ fn item_for(n: Noun) -> Option<Item> {
         Noun::HotDog => Item::HotDog,
         Noun::Carnation => Item::Carnation,
         Noun::Mints => Item::Mints,
+        Noun::Ticket => Item::Ticket,
+        Noun::Rod => Item::Rod,
+        Noun::Shrimp => Item::Shrimp,
+        Noun::Flounder => Item::Flounder,
+        Noun::Key => Item::Key,
+        Noun::Gown => Item::Gown,
         _ => return None,
     })
 }
@@ -245,16 +281,22 @@ fn place_noun(scene: SceneId) -> Noun {
         SceneId::Store => Noun::Store,
         SceneId::Casino => Noun::Casino,
         SceneId::Rooftop => Noun::Rooftop,
+        SceneId::Pier => Noun::Pier,
+        SceneId::Laundromat => Noun::Laundromat,
+        SceneId::Motel => Noun::Motel,
     }
 }
 
-const PLACES: [Noun; 6] = [
+const PLACES: [Noun; 9] = [
     Noun::Bar,
     Noun::Boardwalk,
     Noun::Alley,
     Noun::Store,
     Noun::Casino,
     Noun::Rooftop,
+    Noun::Pier,
+    Noun::Laundromat,
+    Noun::Motel,
 ];
 
 impl Game {
@@ -273,9 +315,10 @@ impl Game {
         vec![
             "THE END".into(),
             String::new(),
-            "Vonda hired Chip on the spot:".into(),
-            "backup vocals at the Crow's Nest,".into(),
-            "Thursdays and alternate Saturdays.".into(),
+            "Vonda slipped into her midnight gown,".into(),
+            "hired Chip on the spot as backup vocals,".into(),
+            "Thursdays and alternate Saturdays,".into(),
+            "and tipped a pelican on her way out.".into(),
             String::new(),
             "He came looking for romance and found".into(),
             "something rarer in a beach town:".into(),
@@ -334,11 +377,15 @@ impl Game {
                 (N::Woman, S::Boardwalk) => N::Dot,
                 (N::Woman, S::Store) => N::Brenda,
                 (N::Woman, S::Rooftop) => N::Vonda,
+                (N::Woman, S::Laundromat) => N::Dee,
+                (N::Woman, S::Motel) => N::Ferris,
+                (N::Man, S::Pier) => N::Pelican,
                 (N::Machine, S::Bar) => N::Jukebox,
                 (N::Machine, S::Store) => N::Slushie,
                 (N::Machine, S::Casino) => N::Slots,
                 (N::Door, S::Rooftop) => N::Elevator,
-                (N::Railing, S::Boardwalk) => N::Ocean,
+                (N::Railing, S::Boardwalk | S::Pier) => N::Ocean,
+                (N::Machine, S::Laundromat) => N::Dryer,
                 (N::Money, _)
                     if s.cash == 0
                         && s.has(Item::Quarter)
@@ -368,6 +415,8 @@ impl Game {
     fn run(&mut self, cmd: &Command) -> Reply {
         match cmd.verb {
             Verb::Help => return Reply::say(HELP),
+            Verb::Hint => return hints::hint(self),
+            Verb::Verbs => return Reply::say(VERBS),
             Verb::Inventory => return self.inventory(),
             Verb::Score => {
                 return Reply::say(format!(
@@ -396,6 +445,9 @@ impl Game {
             SceneId::Store => store::handle(self, cmd),
             SceneId::Casino => casino::handle(self, cmd),
             SceneId::Rooftop => rooftop::handle(self, cmd),
+            SceneId::Pier => pier::handle(self, cmd),
+            SceneId::Laundromat => laundromat::handle(self, cmd),
+            SceneId::Motel => motel::handle(self, cmd),
         };
         if let Some(r) = r {
             return r;
@@ -502,6 +554,9 @@ impl Game {
     fn items(&mut self, cmd: &Command) -> Option<Reply> {
         use Noun as N;
         use Verb as V;
+        if cmd.verb == V::Eat && cmd.noun() == Some(N::Shrimp) && self.state.has(Item::Shrimp) {
+            return shrimp_death(self);
+        }
         let s = &mut self.state;
         fn owned_by(s: &GameState, n: Noun) -> bool {
             item_for(n).is_some_and(|i| s.has(i))
@@ -517,6 +572,12 @@ impl Game {
                 N::Carnation if s.flag(Flag::WearingCarnation) => "A red carnation, pinned to your powder-blue lapel. Bold. Daring. Slightly wilted.",
                 N::Carnation => "A single red carnation, slightly wilted, like a lot of things at this hour.",
                 N::Mints => "Arctic Blast breath mints: \"So strong they're technically a weather event.\"",
+                N::Ticket => "A pink claim ticket stamped SUDS & DUDS, with \"DRYER 3\" scrawled on it in lipstick, and a little sequin glued to the corner. Vonda's handwriting. Or, at the very least, Vonda's lipstick.",
+                N::Rod => "A loaner fishing rod, tagged \"YES, THAT MEANS YOU.\" It's seen more bait than success.",
+                N::Shrimp => "A complimentary cocktail shrimp: pink, curled, and the temperature of a warm hand. You should NOT eat it. It's a fishing lure, not a lifestyle.",
+                N::Flounder => "A flounder, flat as a pancake and twice as judgmental. Both eyes are on one side of its face, and every one of them is looking at you.",
+                N::Key => "A small brass key on a tag marked \"DRYER 3.\" It's slightly damp and smells faintly of pelican.",
+                N::Gown => "Vonda's midnight gown: gold lamé, nine thousand sequins, and warm from the dryer. It weighs about as much as a small dog and glitters like a whole disco.",
                 _ => "Five damp dollars, recently rescued from a storm drain. They smell like freedom. And drain.",
             }),
             (V::Read, Some(N::Matchbook)) | (V::Read, None) | (V::Open, Some(N::Matchbook)) if s.has(Item::Matchbook) => {
@@ -541,7 +602,10 @@ impl Game {
                 let pts = s.award(Flag::WearingCarnation, 2);
                 scored(Reply::say("You pin the red carnation to your lapel. Red on powder blue: a bold choice. A Chip Valentine choice."), pts)
             }
+            (V::Wear, Some(N::Gown)) if s.has(Item::Gown) => say("You hold the gown up to your tux. Gold on powder blue is a bold choice, and the sequins do flatter your eyes, but you're not Vonda. Nobody's Vonda."),
             (V::Wear, _) => say("That's not exactly evening wear."),
+            (V::Eat, Some(N::Flounder)) if s.has(Item::Flounder) => say("Raw, whole, and still looking at you? Not even Chip's stomach is that brave. Besides, someone else has a prior claim."),
+            (V::Eat, Some(N::Gown | N::Key | N::Ticket | N::Rod)) if owned_by(s, n.unwrap_or(N::Me)) => say("Chip is hungry, but not THAT hungry."),
             (V::Eat, Some(N::HotDog)) if s.has(Item::HotDog) => say("Tempting, but this hot dog feels destined for someone hungrier than you. Someone who hasn't eaten since Tuesday, say."),
             (V::Use, Some(N::Comb)) if cmd.second().is_none_or(|x| x == N::Me) => say("You run the comb through your pompadour. It reaches maximum altitude. Air traffic control is notified."),
             (V::Drop, Some(x)) if owned_by(s, x) || x == N::Money => say("Drop it? Here? Somebody would have it pawned before it hit the ground."),
@@ -581,9 +645,20 @@ impl Game {
             Verb::Wear => "That's not exactly evening wear.",
             Verb::Sing => "You croon a few bars. Somewhere a dog howls along. In harmony, at least.",
             Verb::Search => "You find nothing but lint and regret.",
-            Verb::Inventory | Verb::Score | Verb::Help | Verb::Save | Verb::Restore | Verb::Restart | Verb::Quit => "",
+            Verb::Inventory | Verb::Score | Verb::Help | Verb::Hint | Verb::Verbs | Verb::Save | Verb::Restore | Verb::Restart | Verb::Quit => "",
         })
     }
+}
+
+/// Eating the complimentary shrimp, anywhere. Do not do this.
+pub(crate) fn shrimp_death(g: &mut Game) -> Option<Reply> {
+    g.die(
+        DeathKind::Shrimp,
+        vec![
+            "It's pink. It's wet. It's complimentary. How bad could it be? You pop the shrimp in your mouth. It tastes like the sea, a basement, and a mistake.",
+            "Ten minutes later, your stomach files a formal complaint. Twenty minutes later, your stomach files for divorce. By midnight, Chip Valentine is lying very still on the floor, as the soap opera hums on in the background, and a breakfast cart rolls slightly, as if it's trying not to look guilty.",
+        ],
+    )
 }
 
 /// First-visit description for a scene.
@@ -595,5 +670,8 @@ pub fn scene_intro(scene: SceneId) -> &'static str {
         SceneId::Store => store::INTRO,
         SceneId::Casino => casino::INTRO,
         SceneId::Rooftop => rooftop::INTRO,
+        SceneId::Pier => pier::INTRO,
+        SceneId::Laundromat => laundromat::INTRO,
+        SceneId::Motel => motel::INTRO,
     }
 }

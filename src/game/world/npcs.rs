@@ -232,6 +232,150 @@ pub fn vonda(frame: u8) -> Sprite {
     s
 }
 
+const DEE: [&str; 25] = [
+    "..MMMMMMM..",
+    ".MmMmMmMmM.",
+    ".MMrrrrrMM.",
+    "..rKrrrKr..",
+    "..rrrrrrr..",
+    "..rrRRRrr..",
+    "...rrrrr...",
+    "..CCCCCCC..",
+    ".CCCCCCCCC.",
+    "rCCCCCCCCCr",
+    "rCCWWWWWCCr",
+    ".CCWWWWWCC.",
+    "..CCWWWCC..",
+    "..CCCCCCC..",
+    "..CCCCCCC..",
+    "..NNN.NNN..",
+    "..NNN.NNN..",
+    "..NNN.NNN..",
+    "..NNN.NNN..",
+    "..NNN.NNN..",
+    "..NNN.NNN..",
+    "..NNN.NNN..",
+    ".WWWW.WWWW.",
+    ".WWWW.WWWW.",
+    ".KKKK.KKKK.",
+];
+
+/// Dee, the laundromat attendant, folding a towel with grim efficiency.
+pub fn dee(frame: u8) -> Sprite {
+    let mut s = Sprite::from_rows(&DEE);
+    if frame % 2 == 1 {
+        // The towel goes up a row; so do her hands.
+        for x in 3..8 {
+            s.set(x, 9, Some(WHITE));
+            s.set(x, 12, None);
+        }
+        s.set(0, 8, Some(LIGHT_RED));
+        s.set(10, 8, Some(LIGHT_RED));
+        s.set(0, 9, Some(LIGHT_RED));
+        s.set(10, 9, Some(LIGHT_RED));
+    }
+    s
+}
+
+const FERRIS: [&str; 25] = [
+    "....MMM....",
+    "...MMmMM...",
+    "..MMMMMMM..",
+    "..MmMMMmM..",
+    "..MMMMMMM..",
+    "..MMrrrMM..",
+    "..KWKrKWK..",
+    "..rrrrrrr..",
+    "..rrRRRrr..",
+    "...rrrrr...",
+    "..mmmmmmm..",
+    ".mmmYmmmmm.",
+    ".mmmmmmmmm.",
+    "rmmmmmmmmmr",
+    "rmmmmmmmmmr",
+    ".mmmmmmmmm.",
+    "..mmmmmmm..",
+    "..KKKKKKK..",
+    "..KKKKKKK..",
+    "..KKKKKKK..",
+    "..KKK.KKK..",
+    "..rrr.rrr..",
+    "..rrr.rrr..",
+    ".WWWW.WWWW.",
+    ".KKKK.KKKK.",
+];
+
+/// Ferris, the motel's night manager, nodding off in front of her soaps.
+pub fn ferris(frame: u8) -> Sprite {
+    let mut s = Sprite::from_rows(&FERRIS);
+    if frame % 4 >= 2 {
+        // Eyes shut behind the glasses; a Z floats up.
+        for x in [2, 3, 4, 6, 7, 8] {
+            s.set(x, 6, Some(BLACK));
+        }
+        s.set(9, 3, Some(WHITE));
+        s.set(10, 2, Some(WHITE));
+    }
+    s
+}
+
+const PELICAN: [&str; 16] = [
+    "........WWWW........",
+    ".......WWWWWW.......",
+    ".......WWKWWW.......",
+    ".......WWWWWWYYYYYYY",
+    ".......WWWWWWYYYYYYY",
+    "......WWWWWWWSSSSSSY",
+    ".....WWWWWWWWWSSSSS.",
+    "....WWWWWWWWWWWSSS..",
+    "..LLWWWWWWWWWWWW....",
+    ".LLLWWWWWWWWWWWW....",
+    ".LLLWWWWWWWWWWWL....",
+    "..LLLWWWWWWWWLL.....",
+    "....LLLLLLLLL.......",
+    ".....Y....Y.........",
+    ".....Y....Y.........",
+    "....YYY..YYY........",
+];
+
+/// Percival the pelican. `right`: facing east. `glint`: a brass key twinkles
+/// in his pouch. `frame` waddles his feet and bobs his head.
+pub fn pelican(frame: u8, right: bool, glint: bool) -> Sprite {
+    let mut s = Sprite::from_rows(&PELICAN);
+    if frame % 2 == 1 {
+        // The other foot forward, head bobbing one pixel.
+        for y in 13..16 {
+            for x in 0..s.w {
+                s.set(x, y, None);
+            }
+        }
+        for (x, y) in [
+            (7, 13),
+            (7, 14),
+            (6, 15),
+            (7, 15),
+            (8, 15),
+            (11, 13),
+            (11, 14),
+            (10, 15),
+            (11, 15),
+            (12, 15),
+        ] {
+            s.set(x, y, Some(YELLOW));
+        }
+    }
+    if glint {
+        let on = frame % 4 < 2;
+        s.set(16, 6, Some(if on { WHITE } else { BROWN }));
+        s.set(17, 6, Some(if on { YELLOW } else { BROWN }));
+    }
+    if right {
+        s
+    } else {
+        s.mirrored()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -244,5 +388,10 @@ mod tests {
         assert_ne!(brenda(0), brenda(3));
         assert_ne!(tiny(0), tiny(5));
         assert_ne!(vonda(0), vonda(1));
+        assert_ne!(dee(0), dee(1));
+        assert_ne!(ferris(0), ferris(2));
+        assert_ne!(pelican(0, true, true), pelican(1, true, true));
+        assert_ne!(pelican(0, true, false), pelican(0, true, true));
+        assert_ne!(pelican(0, true, false), pelican(0, false, false));
     }
 }

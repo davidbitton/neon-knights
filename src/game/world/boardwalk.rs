@@ -1,7 +1,7 @@
 //! The boardwalk: the hub connecting the bar, the alley, the store and the casino.
 
 use super::{
-    c, hs, npcs, rect_sprite, stars, Exit, Hotspot, Lcg, Placed, Rect, PIC_BOTTOM, STATUS_H,
+    c, hs, npcs, rect_sprite, stars, text, Exit, Hotspot, Lcg, Placed, Rect, PIC_BOTTOM, STATUS_H,
 };
 use crate::engine::gfx::{priority_for_y, Pen, Picture, CTRL_BLOCK, CTRL_WALK};
 use crate::engine::palette::*;
@@ -10,7 +10,7 @@ use crate::game::state::{GameState, SceneId};
 
 pub const DOT_POS: (i32, i32) = (168, 127);
 
-pub const EXITS: [Exit; 4] = [
+pub const EXITS: [Exit; 5] = [
     Exit {
         zone: Rect::new(38, 101, 64, 105),
         to: SceneId::Bar,
@@ -38,6 +38,13 @@ pub const EXITS: [Exit; 4] = [
         arrive: (300, 140),
         nouns: &[Noun::Alley],
         back: (16, 128),
+    },
+    Exit {
+        zone: Rect::new(312, 101, 320, 150),
+        to: SceneId::Pier,
+        arrive: (16, 128),
+        nouns: &[Noun::Pier],
+        back: (300, 128),
     },
 ];
 
@@ -272,6 +279,13 @@ pub fn draw(_state: &GameState) -> Picture {
     }
     p.fill_rect(146, 128, 195, 143, Pen::control_only(CTRL_BLOCK));
     p.fill_rect(158, 120, 180, 129, Pen::control_only(CTRL_BLOCK));
+    // A signpost at the far end: the pier is that way.
+    p.fill_rect(305, 70, 307, 100, c(BROWN));
+    p.fill_polygon(
+        &[(286, 72), (306, 72), (313, 77), (306, 82), (286, 82)],
+        c(WHITE),
+    );
+    text(&mut p, 289, 74, "PIER", BLACK, 1);
     p
 }
 

@@ -3,7 +3,7 @@
 use super::{near, say, Game, Reply};
 use crate::game::logic::Effect;
 use crate::game::parser::{Command, Noun as N, Verb as V};
-use crate::game::state::{DeathKind, Flag, Npc};
+use crate::game::state::{DeathKind, Flag, Item, Npc};
 
 pub const INTRO: &str = "The elevator doors open onto the Crow's Nest: a rooftop lounge strung with party lights, the whole town glittering below. A grand piano. A microphone. A drained swimming pool. And there, by the piano, in a gown of approximately nine thousand sequins: Vonda.";
 
@@ -11,7 +11,7 @@ pub(super) fn handle(g: &mut Game, cmd: &Command) -> Option<Reply> {
     let n = cmd.noun();
     match (cmd.verb, n) {
         (V::Look, None | Some(N::Room) | Some(N::Rooftop)) => say("The Crow's Nest: party lights, a grand piano, a microphone, one cocktail table, and a swimming pool that has been drained for repairs. Vonda stands by the piano, glittering. The elevator goes back down to the casino."),
-        (V::Look, Some(N::Vonda)) => say("Vonda: sequins from neck to ankle, a voice like warm honey poured over gravel, and hair so big it has its own weather. She's humming a ballad and watching the elevator."),
+        (V::Look, Some(N::Vonda)) => say("Vonda: sequins from neck to ankle (her second-best, she'll tell you), a voice like warm honey poured over gravel, and hair so big it has its own weather. She's humming a ballad and watching the elevator."),
         (V::Talk | V::Sing | V::Flirt | V::Dance, Some(N::Vonda) | None) => vonda(g),
         (V::Give, _) if cmd.mentions(N::Vonda) => vonda(g),
         (V::Look, Some(N::Piano)) => say("A black grand piano with a cigarette burn on middle C. It has played more weddings than a priest."),
@@ -46,20 +46,35 @@ fn vonda(g: &mut Game) -> Option<Reply> {
     }
     let s = &mut g.state;
     s.talk(Npc::Vonda);
+    if s.flag(Flag::Sang) {
+        if s.has(Item::Gown) {
+            s.award(Flag::Won, 2);
+            return Some(
+                Reply::many(vec![
+                    "You hold out the gold lamé gown. Vonda gasps, presses it to her chest, and, with all the dignity of a woman who has been waiting two weeks, kisses you on both cheeks. \"Sugar, you ARE a hero.\"",
+                    "Three minutes later she's back from the powder room, in gold from neck to ankle, glittering like a dropped chandelier. The band hits the opening bars. She takes the microphone, glances at you, and says, with a wink, the words you've waited all night to hear:",
+                    "\"You're hired. Backup vocals. Thursdays and alternate Saturdays. And honey, bring the pompadour.\"",
+                ])
+                .with(Effect::Won),
+            );
+        }
+        return say("Vonda squeezes your hand. \"My midnight set starts any minute, and I'm in my SECOND-best gown. The gold one, the lamé, is in Dryer 3 at Suds & Duds. Dee has the key, or the pelican does. Bring me my gown, sugar, and the job is yours.\" She taps the claim ticket in your pocket and winks.");
+    }
     if !s.flag(Flag::DrankDrink) {
         return say("Vonda spots your carnation and stops mid-note. \"So YOU'RE my matchbook man. Well, don't just stand there, sugar. Sing me something.\" You open your mouth. What comes out is a squeak only dolphins can hear. You need some liquid courage.");
     }
     if !s.flag(Flag::AteMints) {
         return say("Vonda spots your carnation and leans in close... then leans way, way back. \"Honey, your breath smells like bilge water.\" Which, to be fair, it is.");
     }
-    s.award(Flag::Won, 10);
+    s.award(Flag::Sang, 10);
+    s.award(Flag::GotTicket, 2);
+    s.add(Item::Ticket);
     Some(
         Reply::many(vec![
             "Vonda spots your carnation and smiles a smile that could jump-start a stalled car. \"So YOU'RE my matchbook man.\" You smile back, minty fresh and brimming with Bilge Water courage.",
             "She hands you the microphone. The piano swells. And for three glorious minutes, Chip Valentine sings his heart out under the party lights, hitting notes that haven't been hit on this coast since 1977.",
-            "The lounge erupts. Someone throws a carnation. Vonda takes your hand, looks deep into your eyes, and says the words you've waited all night to hear:",
-            "\"You're hired.\"",
+            "The lounge erupts. Someone throws a carnation. Vonda takes your hand, and her smile falters, just a little. \"Sugar, you're perfect. But my midnight gown, the gold one, is in Dryer 3 at Suds & Duds, down the alley. Dryer's out of order, the key's gone, and I'm in my SECOND-best sequins. Bring it to me before midnight and you've got a job. Here.\" She presses a pink claim ticket into your hand.",
         ])
-        .with(Effect::Won),
+        .with(Effect::Scored(12)),
     )
 }

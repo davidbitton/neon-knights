@@ -29,6 +29,8 @@ pub enum Verb {
     Inventory,
     Score,
     Help,
+    Hint,
+    Verbs,
     Save,
     Restore,
     Restart,
@@ -65,6 +67,9 @@ pub enum Noun {
     Store,
     Casino,
     Rooftop,
+    Pier,
+    Laundromat,
+    Motel,
     // Boardwalk.
     Dot,
     Cart,
@@ -95,8 +100,27 @@ pub enum Noun {
     Piano,
     Pool,
     City,
+    // Pier.
+    Pelican,
+    Shack,
+    Rod,
+    // Laundromat.
+    Dee,
+    Dryer,
+    Washer,
+    Lint,
+    // Motel.
+    Ferris,
+    Desk,
+    Bell,
+    Tv,
     // Inventory.
     Money,
+    Ticket,
+    Shrimp,
+    Flounder,
+    Key,
+    Gown,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -133,6 +157,9 @@ pub enum ParseError {
 /// Words that are silently skipped.
 pub const FILLER: &[&str] = &[
     "the",
+    "3",
+    "three",
+    "number",
     "a",
     "an",
     "at",
@@ -217,12 +244,14 @@ pub fn verb_for(word: &str) -> Option<Verb> {
         "look" | "l" | "examine" | "x" | "inspect" | "check" | "view" | "see" | "watch"
         | "observe" | "describe" | "ogle" | "peer" => Look,
         "read" => Read,
-        "take" | "get" | "grab" | "pick" | "steal" | "pocket" | "snag" | "nab" => Take,
+        "take" | "get" | "grab" | "pick" | "steal" | "pocket" | "snag" | "nab" | "catch"
+        | "borrow" | "hook" => Take,
         "drop" | "discard" | "toss" => Drop,
         "talk" | "speak" | "chat" | "ask" | "greet" | "hello" | "hi" | "hey" | "say" | "tell" => {
             Talk
         }
-        "use" | "insert" | "put" | "push" | "press" | "pull" | "yank" => Use,
+        "use" | "insert" | "put" | "push" | "press" | "pull" | "yank" | "cast" | "reel"
+        | "ring" | "tap" => Use,
         "open" | "unlock" | "enter" => Open,
         "close" | "shut" => Close,
         "eat" | "taste" | "bite" | "swallow" | "devour" | "nibble" | "chew" => Eat,
@@ -243,7 +272,9 @@ pub fn verb_for(word: &str) -> Option<Verb> {
         "search" | "fish" | "dig" | "rummage" | "reach" => Search,
         "inventory" | "inv" | "i" => Inventory,
         "score" | "points" => Score,
-        "help" | "?" | "hint" | "hints" | "commands" => Help,
+        "help" | "?" => Help,
+        "hint" | "hints" | "clue" | "clues" | "stuck" => Hint,
+        "verbs" | "verb" | "commands" | "vocabulary" | "words" => Verbs,
         "save" => Save,
         "restore" | "load" => Restore,
         "restart" => Restart,
@@ -293,7 +324,7 @@ pub fn noun_for(word: &str) -> Option<Noun> {
         "cart" | "stand" | "umbrella" => Cart,
         "hotdog" | "hot" | "dog" | "frank" | "wiener" | "sausage" => HotDog,
         "telescope" | "scope" | "binoculars" | "viewer" | "eyepiece" => Telescope,
-        "ocean" | "sea" | "beach" | "waves" | "surf" | "pier" => Ocean,
+        "ocean" | "sea" | "beach" | "waves" | "surf" | "water" => Ocean,
         "railing" | "rail" | "edge" | "ledge" => Railing,
         "mime" | "gerard" | "performer" => Mime,
         "dumpster" | "bin" => Dumpster,
@@ -315,6 +346,26 @@ pub fn noun_for(word: &str) -> Option<Noun> {
         "vonda" | "singer" | "diva" | "sweetheart" => Vonda,
         "piano" | "keys" | "pianist" => Piano,
         "pool" | "swimming" => Pool,
+        "pier" | "dock" | "wharf" => Pier,
+        "laundromat" | "laundry" | "suds" | "duds" | "launderette" | "washateria" => Laundromat,
+        "motel" | "sandpiper" | "motor" | "court" | "inn" => Motel,
+        "pelican" | "percival" | "bird" | "birdie" | "beak" | "pouch" => Pelican,
+        "shack" | "tackle" | "hut" | "stall" | "kiosk" => Shack,
+        "rod" | "pole" | "fishing" | "rods" => Rod,
+        "dee" | "attendant" | "laundress" | "tumble" => Dee,
+        "dryer" | "dryers" | "tumbler" | "dryer-3" => Dryer,
+        "washer" | "washers" | "washing" | "washtub" => Washer,
+        "lint" | "trap" | "sock" | "socks" | "fluff" => Lint,
+        "ferris" | "manager" | "receptionist" | "concierge" => Ferris,
+        "desk" | "reception" => Desk,
+        "bell" | "ding" | "buzzer" => Bell,
+        "tv" | "television" | "telly" | "set" | "soaps" => Tv,
+        "ticket" | "claim" | "stub" | "receipt" | "slip" => Ticket,
+        "shrimp" | "prawn" | "prawns" | "tray" | "buffet" | "breakfast" | "continental"
+        | "bait" => Shrimp,
+        "flounder" | "fish" | "fillet" => Flounder,
+        "key" | "keyring" | "brass" | "dryerkey" => Key,
+        "gown" | "dress" | "sequins" | "sequin" | "sequined" | "outfit" => Gown,
         "city" | "skyline" | "view" | "stars" | "sky" | "moon" => City,
         _ => return None,
     })
@@ -451,6 +502,33 @@ mod tests {
         assert_eq!(parse("drink the drink"), cmd(Verb::Drink, &[Noun::Drink]));
         assert_eq!(parse("order a drink"), cmd(Verb::Order, &[Noun::Drink]));
         assert_eq!(parse("eat pickled egg"), cmd(Verb::Eat, &[Noun::Egg]));
+    }
+
+    #[test]
+    fn milestone4_vocabulary() {
+        assert_eq!(parse("hint"), cmd(Verb::Hint, &[]));
+        assert_eq!(parse("stuck"), cmd(Verb::Hint, &[]));
+        assert_eq!(parse("verbs"), cmd(Verb::Verbs, &[]));
+        assert_eq!(parse("commands"), cmd(Verb::Verbs, &[]));
+        assert_eq!(
+            parse("give the flounder to the pelican"),
+            cmd(Verb::Give, &[Noun::Flounder, Noun::Pelican])
+        );
+        assert_eq!(
+            parse("use the key on dryer 3"),
+            cmd(Verb::Use, &[Noun::Key, Noun::Dryer])
+        );
+        assert_eq!(
+            parse("use comb on the manager"),
+            cmd(Verb::Use, &[Noun::Comb, Noun::Ferris])
+        );
+        assert_eq!(parse("take the rod"), cmd(Verb::Take, &[Noun::Rod]));
+        assert_eq!(parse("ring bell"), cmd(Verb::Use, &[Noun::Bell]));
+        // "fish" is a verb first (rummage), and a noun only after one.
+        assert_eq!(parse("fish"), cmd(Verb::Search, &[]));
+        assert_eq!(parse("take fish"), cmd(Verb::Take, &[Noun::Flounder]));
+        assert_eq!(parse("walk to the pier"), cmd(Verb::Go, &[Noun::Pier]));
+        assert_eq!(parse("go to the motel"), cmd(Verb::Go, &[Noun::Motel]));
     }
 
     #[test]

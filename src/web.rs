@@ -290,6 +290,7 @@ impl App {
 
     /// Redraw the scene picture if the scene or any flag changed.
     fn sync_pic(&mut self) {
+        self.game.state.clock = self.ticks;
         let key = (self.game.state.scene, self.game.state.flags);
         if key != self.pic_key {
             self.pic = world::draw(&self.game.state);
@@ -357,6 +358,7 @@ impl App {
     fn submit(&mut self, line: &str) {
         let line = line.trim().to_string();
         self.game.state.hero = (self.hero.x, self.hero.y);
+        self.game.state.clock = self.ticks;
         let reply = self.game.input(&line);
         self.last_cmd = Some(line);
         self.apply(reply);
@@ -595,6 +597,7 @@ impl App {
 
     fn tick(&mut self) {
         self.ticks += 1;
+        self.game.state.clock = self.ticks;
         if self.mode != Mode::Playing || !self.queue.is_empty() {
             return;
         }

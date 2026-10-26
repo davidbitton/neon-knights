@@ -8,7 +8,10 @@ pub mod alley;
 pub mod bar;
 pub mod boardwalk;
 pub mod casino;
+pub mod laundromat;
+pub mod motel;
 pub mod npcs;
+pub mod pier;
 pub mod rooftop;
 pub mod screens;
 pub mod store;
@@ -108,6 +111,9 @@ pub fn draw(state: &GameState) -> Picture {
         SceneId::Store => store::draw(state),
         SceneId::Casino => casino::draw(state),
         SceneId::Rooftop => rooftop::draw(state),
+        SceneId::Pier => pier::draw(state),
+        SceneId::Laundromat => laundromat::draw(state),
+        SceneId::Motel => motel::draw(state),
     }
 }
 
@@ -120,6 +126,9 @@ pub fn hotspots(state: &GameState) -> Vec<Hotspot> {
         SceneId::Store => store::hotspots(state),
         SceneId::Casino => casino::hotspots(state),
         SceneId::Rooftop => rooftop::hotspots(state),
+        SceneId::Pier => pier::hotspots(state),
+        SceneId::Laundromat => laundromat::hotspots(state),
+        SceneId::Motel => motel::hotspots(state),
     }
 }
 
@@ -131,6 +140,9 @@ pub fn exits(scene: SceneId) -> &'static [Exit] {
         SceneId::Store => &store::EXITS,
         SceneId::Casino => &casino::EXITS,
         SceneId::Rooftop => &rooftop::EXITS,
+        SceneId::Pier => &pier::EXITS,
+        SceneId::Laundromat => &laundromat::EXITS,
+        SceneId::Motel => &motel::EXITS,
     }
 }
 
@@ -143,6 +155,9 @@ pub fn actors(state: &GameState, ticks: u64) -> Vec<Placed> {
         SceneId::Store => store::actors(state, ticks),
         SceneId::Casino => casino::actors(state, ticks),
         SceneId::Rooftop => rooftop::actors(state, ticks),
+        SceneId::Pier => pier::actors(state, ticks),
+        SceneId::Laundromat => laundromat::actors(state, ticks),
+        SceneId::Motel => motel::actors(state, ticks),
     }
 }
 
@@ -238,6 +253,25 @@ pub fn noun_word(n: Noun) -> &'static str {
         Pool => "pool",
         City => "skyline",
         Money => "money",
+        Pier => "pier",
+        Laundromat => "laundromat",
+        Motel => "motel",
+        Pelican => "pelican",
+        Shack => "bait shack",
+        Rod => "fishing rod",
+        Dee => "dee",
+        Dryer => "dryer",
+        Washer => "washer",
+        Lint => "lint",
+        Ferris => "ferris",
+        Desk => "desk",
+        Bell => "bell",
+        Tv => "tv",
+        Ticket => "ticket",
+        Shrimp => "shrimp",
+        Flounder => "flounder",
+        Key => "key",
+        Gown => "gown",
     }
 }
 
@@ -247,6 +281,23 @@ impl Lcg {
     pub fn next(&mut self, n: u32) -> i32 {
         self.0 = self.0.wrapping_mul(1_103_515_245).wrapping_add(12_345);
         ((self.0 >> 16) % n) as i32
+    }
+}
+
+/// Draw `s` into the picture's visual plane with its top-left at (x, y),
+/// each font pixel `scale` x `scale` (neon signs and the like).
+pub(crate) fn text(p: &mut Picture, x: i32, y: i32, s: &str, col: u8, scale: i32) {
+    use crate::engine::font::{glyph, CELL_W, GLYPH_W};
+    for (i, ch) in s.chars().enumerate() {
+        let gx = x + i as i32 * CELL_W * scale;
+        for (row, bits) in glyph(ch).iter().enumerate() {
+            for cx in 0..GLYPH_W {
+                if bits & (1 << (GLYPH_W - 1 - cx)) != 0 {
+                    let (px, py) = (gx + cx * scale, y + row as i32 * scale);
+                    p.fill_rect(px, py, px + scale, py + scale, Pen::color(col));
+                }
+            }
+        }
     }
 }
 

@@ -1,5 +1,5 @@
 use super::*;
-use crate::game::state::DeathKind;
+use crate::game::state::{DeathKind, Npc};
 use crate::game::world::hotspot_for;
 
 /// Stand at a hotspot's approach point, as click-to-walk would.
@@ -165,17 +165,67 @@ fn full_walkthrough_reaches_max_score_and_ending() {
     walk_to_scene(&mut g, SceneId::Rooftop);
     assert_eq!(g.state.scene, SceneId::Rooftop);
 
-    // The Crow's Nest.
+    // The Crow's Nest: Vonda sets the quest.
     scored(&g.input("eat mints"), 2);
     go(&mut g, Noun::Vonda);
-    let r = g.input("sing to vonda");
+    scored(&g.input("sing to vonda"), 12);
+    assert!(g.state.has(Item::Ticket));
+    assert_eq!(g.state.score, 62);
+
+    // Suds & Duds: Dee briefs us on the pelican.
+    walk_to_scene(&mut g, SceneId::Casino);
+    walk_to_scene(&mut g, SceneId::Boardwalk);
+    walk_to_scene(&mut g, SceneId::Alley);
+    walk_to_scene(&mut g, SceneId::Laundromat);
+    assert_eq!(g.state.scene, SceneId::Laundromat);
+    go(&mut g, Noun::Dee);
+    scored(&g.input("give ticket to dee"), 2);
+
+    // Motel: comb Ferris, pocket the shrimp.
+    walk_to_scene(&mut g, SceneId::Alley);
+    walk_to_scene(&mut g, SceneId::Boardwalk);
+    walk_to_scene(&mut g, SceneId::Pier);
+    go(&mut g, Noun::Rod);
+    scored(&g.input("take rod"), 2);
+    walk_to_scene(&mut g, SceneId::Motel);
+    go(&mut g, Noun::Ferris);
+    assert_eq!(g.input("use comb on ferris").effect, Effect::None);
+    assert!(g.state.flag(Flag::FerrisAway));
+    go(&mut g, Noun::Shrimp);
+    scored(&g.input("take shrimp"), 2);
+
+    // Pier: flounder, then the key.
+    walk_to_scene(&mut g, SceneId::Pier);
+    go(&mut g, Noun::Ocean);
+    scored(&g.input("use rod"), 3);
+    assert!(g.state.has(Item::Flounder));
+    go(&mut g, Noun::Pelican);
+    scored(&g.input("give flounder to pelican"), 4);
+    assert!(g.state.has(Item::Key));
+
+    // Back to Dryer 3 and the gown.
+    walk_to_scene(&mut g, SceneId::Boardwalk);
+    walk_to_scene(&mut g, SceneId::Alley);
+    walk_to_scene(&mut g, SceneId::Laundromat);
+    go(&mut g, Noun::Dryer);
+    scored(&g.input("use key on dryer"), 3);
+    assert!(g.state.has(Item::Gown));
+    assert_eq!(g.state.score, 78);
+
+    // Home to the Crow's Nest.
+    walk_to_scene(&mut g, SceneId::Alley);
+    walk_to_scene(&mut g, SceneId::Boardwalk);
+    walk_to_scene(&mut g, SceneId::Casino);
+    walk_to_scene(&mut g, SceneId::Rooftop);
+    go(&mut g, Noun::Vonda);
+    let r = g.input("give gown to vonda");
     assert_eq!(r.effect, Effect::Won);
     assert!(r.messages.last().unwrap().contains("hired"));
     assert_eq!(g.state.score, MAX_SCORE);
     assert!(g.state.flag(Flag::Won));
     let end = g.ending_lines().join("\n");
     assert!(end.contains(&format!("Final score: {MAX_SCORE} of {MAX_SCORE}")));
-    assert!(end.contains("Gentleman of the Evening"));
+    assert!(end.contains("Legend of the Second Night"));
     // Nothing more to do; the game refuses further input.
     assert!(g.input("look").messages[0].contains("Restart"));
 }
@@ -207,6 +257,15 @@ fn vonda_needs_courage_and_fresh_breath() {
     assert!(g.input("talk to vonda").messages[0].contains("bilge water"));
     g.state.add(Item::Mints);
     g.input("eat mints");
+    // The first song earns the claim ticket and sends Chip off to do laundry.
+    scored(&g.input("talk to vonda"), 12);
+    assert!(g.state.has(Item::Ticket));
+    let r = g.input("talk to vonda");
+    assert_eq!(r.effect, Effect::None);
+    assert!(r.messages[0].contains("Dryer 3"));
+    assert!(!g.state.flag(Flag::Won));
+    // Only the gown wins her over.
+    g.state.add(Item::Gown);
     assert_eq!(g.input("talk to vonda").effect, Effect::Won);
 }
 
@@ -298,6 +357,28 @@ fn every_death_is_reachable() {
     go(&mut g, Noun::Pool);
     died(&g.input("dive into pool"), DeathKind::Pool);
     seen.push(DeathKind::Pool);
+
+    // Dryer: climb into Dryer 3 once it's open.
+    let mut g = Game::new();
+    g.state.scene = SceneId::Laundromat;
+    go(&mut g, Noun::Dryer);
+    assert!(g.input("climb into dryer").messages[0].contains("locked"));
+    g.state.set(Flag::DryerOpen);
+    died(&g.input("climb into dryer"), DeathKind::Dryer);
+    seen.push(DeathKind::Dryer);
+
+    // Shrimp: eat the pocket shrimp anywhere...
+    let mut g = Game::new();
+    g.state.add(Item::Shrimp);
+    died(&g.input("eat shrimp"), DeathKind::Shrimp);
+    // ...or the tray, once Ferris isn't watching.
+    let mut g = Game::new();
+    g.state.scene = SceneId::Motel;
+    go(&mut g, Noun::Shrimp);
+    assert_eq!(g.input("eat shrimp").effect, Effect::None);
+    g.state.set(Flag::FerrisAway);
+    died(&g.input("eat the shrimp"), DeathKind::Shrimp);
+    seen.push(DeathKind::Shrimp);
 
     assert_eq!(seen, DeathKind::ALL.to_vec());
     // Each death has a distinct epitaph.
@@ -417,4 +498,243 @@ fn sound_commands_work_anytime() {
     assert_eq!(g.state.moves, moves, "sound commands don't take a turn");
     assert!(sound_command("sound the alarm").is_none());
     assert!(sound_command("look").is_none());
+}
+
+// ---------------------------------------------------------------- milestone 4
+
+/// Start in `scene` with everything needed to be anywhere in the quest.
+fn at(scene: SceneId) -> Game {
+    let mut g = Game::new();
+    g.state.scene = scene;
+    g
+}
+
+#[test]
+fn new_scenes_connect_to_the_map() {
+    let mut g = Game::new();
+    g.input("leave");
+    walk_to_scene(&mut g, SceneId::Pier);
+    assert!(g.input("look").messages[0].contains("Percival"));
+    walk_to_scene(&mut g, SceneId::Motel);
+    walk_to_scene(&mut g, SceneId::Pier);
+    walk_to_scene(&mut g, SceneId::Boardwalk);
+    walk_to_scene(&mut g, SceneId::Alley);
+    let r = walk_to_scene(&mut g, SceneId::Laundromat);
+    assert!(r.messages[0].contains("SUDS & DUDS"));
+    walk_to_scene(&mut g, SceneId::Alley);
+    assert_eq!(g.state.scene, SceneId::Alley);
+    // Typed travel works between neighbours, and not between strangers.
+    assert_eq!(g.input("enter laundromat").effect, Effect::Moved);
+    assert!(g.input("go to pier").messages[0].contains("can't get there"));
+    g.input("leave");
+    g.input("go to boardwalk");
+    assert_eq!(g.input("go to pier").effect, Effect::Moved);
+    assert_eq!(g.input("go to motel").effect, Effect::Moved);
+    for s in [SceneId::Pier, SceneId::Laundromat, SceneId::Motel] {
+        assert!(g.state.flag(s.visited_flag()));
+    }
+}
+
+#[test]
+fn pier_rod_fishing_and_pelican() {
+    let mut g = at(SceneId::Pier);
+    // No rod, no fish.
+    go(&mut g, Noun::Ocean);
+    assert!(g.input("fish").messages[0].contains("rod"));
+    go(&mut g, Noun::Rod);
+    scored(&g.input("take rod"), 2);
+    assert!(g.input("take rod").messages[0].contains("already"));
+    // From the wrong spot you can't cast.
+    g.state.hero = (60, 112);
+    assert!(g.input("use rod").messages[0].contains("front railing"));
+    go(&mut g, Noun::Ocean);
+    // No bait.
+    assert!(g.input("use rod").messages[0].contains("bait"));
+    g.state.add(Item::Shrimp);
+    scored(&g.input("fish"), 3);
+    assert!(!g.state.has(Item::Shrimp));
+    assert!(g.input("fish").messages[0].contains("second"));
+    // The pelican refuses everything but flounder.
+    go(&mut g, Noun::Pelican);
+    g.state.add(Item::Shrimp);
+    assert!(g.input("give shrimp to pelican").messages[0].contains("standards"));
+    assert!(g.state.has(Item::Shrimp));
+    assert!(g.input("talk to pelican").messages[0].contains("Percival"));
+    scored(&g.input("feed flounder to pelican"), 4);
+    assert!(g.state.has(Item::Key) && !g.state.has(Item::Flounder));
+    assert!(g.input("talk to pelican").messages[0].contains("Percival"));
+}
+
+#[test]
+fn motel_ferris_the_comb_and_the_shrimp() {
+    let mut g = at(SceneId::Motel);
+    go(&mut g, Noun::Shrimp);
+    // Ferris is watching.
+    assert!(g.input("take shrimp").messages[0].contains("Guests only"));
+    assert!(!g.state.has(Item::Shrimp));
+    go(&mut g, Noun::Ferris);
+    for _ in 0..3 {
+        g.input("talk to ferris");
+    }
+    assert_eq!(g.state.talks[Npc::Ferris as usize], 3);
+    // Without a comb there is nothing to offer.
+    g.state.remove(Item::Comb);
+    assert!(g.input("use comb on ferris").messages[0].contains("don't have a comb"));
+    g.state.add(Item::Comb);
+    g.input("use comb on ferris");
+    assert!(g.state.flag(Flag::FerrisAway));
+    assert!(g.state.has(Item::Comb), "the comb is never consumed");
+    go(&mut g, Noun::Shrimp);
+    scored(&g.input("take shrimp"), 2);
+    assert!(g.input("take shrimp").messages[0].contains("already"));
+}
+
+#[test]
+fn laundromat_needs_ticket_then_key() {
+    let mut g = at(SceneId::Laundromat);
+    go(&mut g, Noun::Dee);
+    // Dee won't brief a stranger.
+    for _ in 0..4 {
+        assert_eq!(g.input("talk to dee").effect, Effect::None);
+    }
+    assert!(!g.state.flag(Flag::DeeBriefed));
+    g.state.add(Item::Ticket);
+    scored(&g.input("talk to dee"), 2);
+    assert!(g.state.has(Item::Ticket), "the ticket stays in the pocket");
+    // The key alone opens nothing until Dee has briefed us...
+    let mut h = at(SceneId::Laundromat);
+    h.state.add(Item::Key);
+    go(&mut h, Noun::Dryer);
+    assert!(h.input("use key on dryer").messages[0].contains("Ticket"));
+    assert!(!h.state.has(Item::Gown));
+    // ...and without the key the dryer won't budge.
+    go(&mut g, Noun::Dryer);
+    assert!(g.input("open dryer").messages[0].contains("key"));
+    g.state.add(Item::Key);
+    scored(&g.input("use key on dryer"), 3);
+    assert!(g.state.has(Item::Gown) && g.state.flag(Flag::GotGown));
+    assert_eq!(g.input("use key on dryer").effect, Effect::None);
+}
+
+#[test]
+fn vonda_needs_the_gown_not_just_a_song() {
+    let mut g = at(SceneId::Rooftop);
+    g.state.set(Flag::DrankDrink);
+    g.state.set(Flag::AteMints);
+    go(&mut g, Noun::Vonda);
+    scored(&g.input("sing"), 12);
+    assert_eq!(g.state.score, 12);
+    // Singing again changes nothing.
+    assert_eq!(g.input("sing to vonda").effect, Effect::None);
+    assert!(!g.state.flag(Flag::Won));
+    g.state.add(Item::Gown);
+    assert_eq!(g.input("give gown to vonda").effect, Effect::Won);
+    assert_eq!(g.state.score, 14);
+}
+
+#[test]
+fn hint_command_progresses_and_saturates() {
+    let mut g = Game::new();
+    let h1 = g.input("hint").messages[0].clone();
+    let h2 = g.input("hint").messages[0].clone();
+    let h3 = g.input("hint").messages[0].clone();
+    let h4 = g.input("hint").messages[0].clone();
+    assert!(h1.starts_with("Hint (1/3)"), "{h1}");
+    assert!(h2.starts_with("Hint (2/3)"), "{h2}");
+    assert!(h3.starts_with("Hint (3/3)"), "{h3}");
+    assert_eq!(h3, h4, "the last hint repeats");
+    assert!(h3.contains("TAKE MATCHBOOK"));
+    // Hints take no turn, cost no points, and move on once the goal is done.
+    assert_eq!(g.state.score, 0);
+    go(&mut g, Noun::Matchbook);
+    g.input("take matchbook");
+    assert!(g.input("hint").messages[0].contains("Hint (1/3)"));
+    assert!(g.state.hints.contains(&3));
+    // Each area talks about its own business.
+    let mut p = at(SceneId::Pier);
+    assert!(p.input("clue").messages[0].contains("Hint (1/3)"));
+    p.input("clue");
+    assert!(p.input("clue").messages[0].contains("TAKE ROD"));
+    let mut l = at(SceneId::Laundromat);
+    assert!(l.input("stuck").messages[0].contains("Hint (1/3)"));
+    let mut m = at(SceneId::Motel);
+    assert!(m.input("hint").messages[0].starts_with("Hint (1/3)"));
+    // Finished area: points elsewhere.
+    let mut b = at(SceneId::Pier);
+    for f in [Flag::GotRod, Flag::CaughtFlounder, Flag::GotKey] {
+        b.state.set(f);
+    }
+    assert!(b.input("hint").messages[0].contains("nothing more to do here"));
+}
+
+#[test]
+fn hint_slots_are_unique_and_saved() {
+    let mut slots = hints::objective_slots();
+    let n = slots.len();
+    slots.sort_unstable();
+    slots.dedup();
+    assert_eq!(slots.len(), n);
+    assert!(slots.iter().all(|&s| s < crate::game::state::HINT_SLOTS));
+    let mut g = Game::new();
+    g.input("hint");
+    g.input("hint");
+    let loaded = GameState::deserialize(&g.state.serialize()).unwrap();
+    assert_eq!(loaded.hints, g.state.hints);
+    assert_eq!(loaded.hints[0], 2);
+}
+
+#[test]
+fn verbs_command_lists_the_words() {
+    let mut g = Game::new();
+    let r = g.input("verbs");
+    assert!(r.messages[0].contains("LOOK") && r.messages[0].contains("HINT"));
+    assert!(g.input("help").messages[0].contains("HINT"));
+    // Neither costs points.
+    g.input("hint");
+    g.input("verbs");
+    assert_eq!(g.state.score, 0);
+}
+
+#[test]
+fn gown_and_items_have_descriptions() {
+    let mut g = Game::new();
+    for (it, word) in [
+        (Item::Ticket, "ticket"),
+        (Item::Rod, "rod"),
+        (Item::Shrimp, "shrimp"),
+        (Item::Flounder, "flounder"),
+        (Item::Key, "key"),
+        (Item::Gown, "gown"),
+    ] {
+        g.state.add(it);
+        let r = g.input(&format!("look at {word}"));
+        assert_ne!(r.effect, Effect::Confused, "{word}");
+        assert!(
+            !r.messages[0].contains("don't see"),
+            "{word}: {:?}",
+            r.messages
+        );
+        assert!(
+            g.input("i").messages[0].to_lowercase().contains(word),
+            "{word}"
+        );
+    }
+    assert!(g.input("eat flounder").messages[0].contains("Raw"));
+}
+
+#[test]
+fn every_tombstone_fits_on_screen() {
+    // The epitaph box grows with its longest line; it must stay on the
+    // 320x200 screen (six pixels a character).
+    for kind in DeathKind::ALL {
+        let d = death(kind);
+        assert!(
+            d.cause.len() <= 28,
+            "{kind:?} title is too long: {}",
+            d.cause
+        );
+        for line in &d.epitaph {
+            assert!(line.len() <= 30, "{kind:?} epitaph line too long: {line}");
+        }
+    }
 }

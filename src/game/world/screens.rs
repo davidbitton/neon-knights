@@ -188,6 +188,25 @@ pub fn draw_tomb(kind: DeathKind) -> Picture {
             p.fill_rect(123, 145, 126, 147, c(LIGHT_RED));
             p.plot(120, 144, c(BLACK));
         }
+        DeathKind::Dryer => {
+            // One lone striped sock, the sole survivor of the cycle.
+            p.fill_rect(106, 151, 124, 156, c(WHITE));
+            p.fill_rect(120, 143, 125, 156, c(WHITE));
+            for x in [108, 112, 116] {
+                p.fill_rect(x, 151, x + 2, 156, c(LIGHT_RED));
+            }
+            p.fill_rect(120, 143, 125, 146, c(LIGHT_RED));
+            p.fill_rect(120, 149, 125, 151, c(LIGHT_RED));
+        }
+        DeathKind::Shrimp => {
+            // A pink curled shrimp, looking pleased with itself.
+            p.fill_ellipse(114, 150, 7, 5, c(LIGHT_RED));
+            p.fill_ellipse(114, 150, 3, 2, c(BLACK));
+            p.fill_ellipse(114, 150, 2, 1, c(LIGHT_RED));
+            p.fill_polygon(&[(120, 154), (127, 150), (127, 158)], c(LIGHT_RED));
+            p.line(106, 146, 102, 141, c(LIGHT_RED));
+            p.plot(107, 147, c(BLACK));
+        }
     }
     p
 }

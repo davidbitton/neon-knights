@@ -1,6 +1,6 @@
 //! The back alley behind the boardwalk: bricks, a dumpster, and a mime.
 
-use super::{c, hs, npcs, stars, Exit, Hotspot, Lcg, Placed, Rect, PIC_BOTTOM, STATUS_H};
+use super::{c, hs, npcs, stars, text, Exit, Hotspot, Lcg, Placed, Rect, PIC_BOTTOM, STATUS_H};
 use crate::engine::gfx::{priority_for_y, Pen, Picture, CTRL_BLOCK, CTRL_WALK};
 use crate::engine::palette::*;
 use crate::game::parser::Noun;
@@ -10,13 +10,22 @@ use crate::game::state::{Flag, GameState, SceneId};
 pub const MIME_BOXED: (i32, i32) = (188, 147);
 pub const MIME_FREE: (i32, i32) = (240, 128);
 
-pub const EXITS: [Exit; 1] = [Exit {
-    zone: Rect::new(312, 101, 320, 174),
-    to: SceneId::Boardwalk,
-    arrive: (16, 128),
-    nouns: &[Noun::Boardwalk],
-    back: (300, 140),
-}];
+pub const EXITS: [Exit; 2] = [
+    Exit {
+        zone: Rect::new(312, 101, 320, 174),
+        to: SceneId::Boardwalk,
+        arrive: (16, 128),
+        nouns: &[Noun::Boardwalk],
+        back: (300, 140),
+    },
+    Exit {
+        zone: Rect::new(0, 101, 10, 174),
+        to: SceneId::Laundromat,
+        arrive: (300, 140),
+        nouns: &[Noun::Laundromat],
+        back: (16, 140),
+    },
+];
 
 pub fn mime_pos(state: &GameState) -> (i32, i32) {
     if state.flag(Flag::MimeFed) {
@@ -214,5 +223,10 @@ pub fn draw(state: &GameState) -> Picture {
         my + 2,
         Pen::control_only(CTRL_BLOCK),
     );
+    // A blade sign for the laundromat down the way (west), lit from within.
+    p.fill_rect(0, 36, 22, 50, c(BLACK));
+    p.rect(0, 36, 22, 50, c(MAGENTA));
+    text(&mut p, 0, 39, "SUDS", LIGHT_MAGENTA, 1);
+    p.fill_rect(2, 47, 6, 48, c(LIGHT_CYAN));
     p
 }

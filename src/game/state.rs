@@ -2,10 +2,12 @@
 //! conversation counters, and save-game serialization (versioned).
 
 /// Every point in the game. See WALKTHROUGH.md for where each one comes from.
-pub const MAX_SCORE: u32 = 60;
+pub const MAX_SCORE: u32 = 80;
 
 /// Current save format tag.
-pub const SAVE_MAGIC: &str = "NN2";
+pub const SAVE_MAGIC: &str = "NN3";
+/// Milestone 2-3 save format (six scenes, six talkers, no hints). Still loads.
+pub const SAVE_MAGIC_V2: &str = "NN2";
 /// Milestone 1 save format (bar only). Still loads.
 pub const SAVE_MAGIC_V1: &str = "NN1";
 
@@ -26,16 +28,23 @@ pub enum SceneId {
     Store,
     Casino,
     Rooftop,
+    // Milestone 4.
+    Pier,
+    Laundromat,
+    Motel,
 }
 
 impl SceneId {
-    pub const ALL: [SceneId; 6] = [
+    pub const ALL: [SceneId; 9] = [
         SceneId::Bar,
         SceneId::Boardwalk,
         SceneId::Alley,
         SceneId::Store,
         SceneId::Casino,
         SceneId::Rooftop,
+        SceneId::Pier,
+        SceneId::Laundromat,
+        SceneId::Motel,
     ];
     pub fn code(self) -> u8 {
         self as u8
@@ -51,6 +60,9 @@ impl SceneId {
             SceneId::Store => "Lucky Gull 24/7",
             SceneId::Casino => "The Golden Clam",
             SceneId::Rooftop => "The Crow's Nest",
+            SceneId::Pier => "Gull Point Pier",
+            SceneId::Laundromat => "Suds & Duds",
+            SceneId::Motel => "The Sandpiper Motor Court",
         }
     }
     pub fn visited_flag(self) -> Flag {
@@ -61,6 +73,9 @@ impl SceneId {
             SceneId::Store => Flag::VisitedStore,
             SceneId::Casino => Flag::VisitedCasino,
             SceneId::Rooftop => Flag::VisitedRooftop,
+            SceneId::Pier => Flag::VisitedPier,
+            SceneId::Laundromat => Flag::VisitedLaundromat,
+            SceneId::Motel => Flag::VisitedMotel,
         }
     }
 }
@@ -73,15 +88,20 @@ pub enum DeathKind {
     Slushie,
     Jackpot,
     Pool,
+    // Milestone 4.
+    Dryer,
+    Shrimp,
 }
 
 impl DeathKind {
-    pub const ALL: [DeathKind; 5] = [
+    pub const ALL: [DeathKind; 7] = [
         DeathKind::Egg,
         DeathKind::Dumpster,
         DeathKind::Slushie,
         DeathKind::Jackpot,
         DeathKind::Pool,
+        DeathKind::Dryer,
+        DeathKind::Shrimp,
     ];
 }
 
@@ -94,10 +114,17 @@ pub enum Item {
     HotDog,
     Carnation,
     Mints,
+    // Milestone 4.
+    Ticket,
+    Rod,
+    Shrimp,
+    Flounder,
+    Key,
+    Gown,
 }
 
 impl Item {
-    pub const ALL: [Item; 7] = [
+    pub const ALL: [Item; 13] = [
         Item::Quarter,
         Item::Comb,
         Item::Matchbook,
@@ -105,6 +132,12 @@ impl Item {
         Item::HotDog,
         Item::Carnation,
         Item::Mints,
+        Item::Ticket,
+        Item::Rod,
+        Item::Shrimp,
+        Item::Flounder,
+        Item::Key,
+        Item::Gown,
     ];
 
     pub fn code(self) -> char {
@@ -116,6 +149,12 @@ impl Item {
             Item::HotDog => 'h',
             Item::Carnation => 'f',
             Item::Mints => 'n',
+            Item::Ticket => 't',
+            Item::Rod => 'r',
+            Item::Shrimp => 's',
+            Item::Flounder => 'b',
+            Item::Key => 'k',
+            Item::Gown => 'g',
         }
     }
     pub fn from_code(c: char) -> Option<Item> {
@@ -130,6 +169,12 @@ impl Item {
             Item::HotDog => "a complimentary hot dog",
             Item::Carnation => "a red carnation",
             Item::Mints => "a tin of Arctic Blast breath mints",
+            Item::Ticket => "a laundry claim ticket",
+            Item::Rod => "a fishing rod",
+            Item::Shrimp => "a complimentary shrimp cocktail",
+            Item::Flounder => "a flounder with a judgmental look",
+            Item::Key => "a brass dryer key",
+            Item::Gown => "Vonda's sequin gown",
         }
     }
 }
@@ -161,7 +206,25 @@ pub enum Flag {
     WearingCarnation = 1 << 19,
     TinyApproved = 1 << 20,
     AteMints = 1 << 21,
+    /// Milestone 4 reworked the finale: singing now earns `Sang`, and `Won`
+    /// (the ending) comes only after the gown is returned.
     Won = 1 << 22,
+    // Milestone 4.
+    Sang = 1 << 23,
+    GotTicket = 1 << 24,
+    DeeBriefed = 1 << 25,
+    GotRod = 1 << 26,
+    GotShrimp = 1 << 27,
+    CaughtFlounder = 1 << 28,
+    GotKey = 1 << 29,
+    GotGown = 1 << 30,
+    VisitedPier = 1 << 31,
+    VisitedLaundromat = 1 << 32,
+    VisitedMotel = 1 << 33,
+    /// The dryer is unlocked (the gown is out of it).
+    DryerOpen = 1 << 34,
+    /// Ferris has left the front desk (her bouffant has been tended to).
+    FerrisAway = 1 << 35,
 }
 
 /// Conversation counters, one per talking NPC.
@@ -173,8 +236,17 @@ pub enum Npc {
     Brenda = 3,
     Tiny = 4,
     Vonda = 5,
+    // Milestone 4.
+    Dee = 6,
+    Ferris = 7,
+    Pelican = 8,
 }
-pub const NPC_COUNT: usize = 6;
+pub const NPC_COUNT: usize = 9;
+/// Talkers in NN2 saves.
+const NPC_COUNT_V2: usize = 6;
+/// Slots for the progressive-hint counters (one per objective; see
+/// `logic::hints`). Saved as one digit each.
+pub const HINT_SLOTS: usize = 24;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GameState {
@@ -188,6 +260,11 @@ pub struct GameState {
     pub moves: u32,
     pub talks: [u32; NPC_COUNT],
     pub dead: bool,
+    /// How many hints have been given for each objective (0-3).
+    pub hints: [u8; HINT_SLOTS],
+    /// The game clock in 50 ms ticks. Not saved: the browser layer sets it
+    /// every tick so roaming characters can be located by the game logic.
+    pub clock: u64,
 }
 
 impl Default for GameState {
@@ -214,6 +291,8 @@ impl GameState {
             moves: 0,
             talks: [0; NPC_COUNT],
             dead: false,
+            hints: [0; HINT_SLOTS],
+            clock: 0,
         }
     }
 
@@ -262,17 +341,19 @@ impl GameState {
             20..=34 => "Smooth Operator (Trainee)",
             35..=49 => "Local Legend (Self-Proclaimed)",
             50..=59 => "Boardwalk Royalty",
-            _ => "Gentleman of the Evening",
+            60..=79 => "Gentleman of the Evening",
+            _ => "Legend of the Second Night",
         }
     }
 
-    /// Compact text format for localStorage (v2):
-    /// `NN2|scene|score|flags|inventory|cash|x|y|moves|talks,comma,separated|dead`
+    /// Compact text format for localStorage (v3):
+    /// `NN3|scene|score|flags|inventory|cash|x|y|moves|talks,comma,separated|dead|hints`
+    /// where `hints` is one digit per objective.
     pub fn serialize(&self) -> String {
         let inv: String = self.inventory.iter().map(|i| i.code()).collect();
         let talks: Vec<String> = self.talks.iter().map(|t| t.to_string()).collect();
         format!(
-            "{SAVE_MAGIC}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+            "{SAVE_MAGIC}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
             self.scene.code(),
             self.score,
             self.flags,
@@ -282,14 +363,16 @@ impl GameState {
             self.hero.1,
             self.moves,
             talks.join(","),
-            self.dead as u8
+            self.dead as u8,
+            self.hints.iter().map(|h| h.to_string()).collect::<String>()
         )
     }
 
     pub fn deserialize(s: &str) -> Result<GameState, LoadError> {
         let parts: Vec<&str> = s.trim().split('|').collect();
         match parts.first() {
-            Some(&SAVE_MAGIC) => Self::load_v2(&parts),
+            Some(&SAVE_MAGIC) => Self::load_v3(&parts),
+            Some(&SAVE_MAGIC_V2) => Self::load_v2(&parts),
             Some(&SAVE_MAGIC_V1) => Self::load_v1(&parts),
             _ => Err(LoadError::BadMagic),
         }
@@ -316,15 +399,13 @@ impl GameState {
         }
     }
 
-    fn load_v2(parts: &[&str]) -> Result<GameState, LoadError> {
-        if parts.len() != 11 {
-            return Err(LoadError::Malformed("field count"));
-        }
+    /// The fields NN2 and NN3 share, with `talk_count` talkers.
+    fn load_common(parts: &[&str], talk_count: usize) -> Result<GameState, LoadError> {
         let scene = SceneId::from_code(Self::num(parts, 1, "scene")? as u8)
             .ok_or(LoadError::Malformed("scene"))?;
         let mut talks = [0u32; NPC_COUNT];
         let raw: Vec<&str> = parts[9].split(',').collect();
-        if raw.len() != NPC_COUNT {
+        if raw.len() != talk_count {
             return Err(LoadError::Malformed("talks"));
         }
         for (slot, r) in talks.iter_mut().zip(raw) {
@@ -345,7 +426,35 @@ impl GameState {
             moves: Self::num(parts, 8, "moves")? as u32,
             talks,
             dead: Self::num(parts, 10, "dead")? != 0,
+            hints: [0; HINT_SLOTS],
+            clock: 0,
         })
+    }
+
+    /// Milestones 2-3: `NN2|...|talks(6)|dead`. No hints yet.
+    fn load_v2(parts: &[&str]) -> Result<GameState, LoadError> {
+        if parts.len() != 11 {
+            return Err(LoadError::Malformed("field count"));
+        }
+        Self::load_common(parts, NPC_COUNT_V2)
+    }
+
+    fn load_v3(parts: &[&str]) -> Result<GameState, LoadError> {
+        if parts.len() != 12 {
+            return Err(LoadError::Malformed("field count"));
+        }
+        let mut st = Self::load_common(parts, NPC_COUNT)?;
+        // Shorter strings (from builds with fewer objectives) are padded.
+        if parts[11].chars().count() > HINT_SLOTS {
+            return Err(LoadError::Malformed("hints"));
+        }
+        for (slot, c) in st.hints.iter_mut().zip(parts[11].chars()) {
+            *slot = match c.to_digit(10) {
+                Some(d) if d <= 3 => d as u8,
+                _ => return Err(LoadError::Malformed("hints")),
+            };
+        }
+        Ok(st)
     }
 
     /// Milestone 1: `NN1|score|flags|inventory|x|y|moves|gus_talks|dead`,
@@ -370,6 +479,8 @@ impl GameState {
             moves: Self::num(parts, 6, "moves")? as u32,
             talks,
             dead: Self::num(parts, 8, "dead")? != 0,
+            hints: [0; HINT_SLOTS],
+            clock: 0,
         })
     }
 }
@@ -398,6 +509,8 @@ mod tests {
         assert_eq!(s.score, 5);
         s.award(Flag::GotDrink, 500);
         assert_eq!(s.score, MAX_SCORE);
+        assert_eq!(s.rank(), "Legend of the Second Night");
+        s.score = 60;
         assert_eq!(s.rank(), "Gentleman of the Evening");
     }
 
@@ -426,7 +539,7 @@ mod tests {
     }
 
     #[test]
-    fn save_roundtrip_v2() {
+    fn save_roundtrip_v3() {
         let mut s = GameState::new();
         s.scene = SceneId::Casino;
         s.award(Flag::TookMatchbook, 5);
@@ -436,10 +549,60 @@ mod tests {
         s.cash = 2;
         s.hero = (123, 140);
         s.moves = 17;
-        s.talks = [1, 2, 3, 0, 4, 0];
+        s.talks = [1, 2, 3, 0, 4, 0, 5, 6, 7];
+        s.hints[0] = 2;
+        s.hints[HINT_SLOTS - 1] = 3;
         let text = s.serialize();
-        assert!(text.starts_with("NN2|4|"));
+        assert!(text.starts_with("NN3|4|"));
+        assert!(text.ends_with("|0|200000000000000000000003"));
         assert_eq!(GameState::deserialize(&text), Ok(s));
+    }
+
+    #[test]
+    fn milestone3_saves_still_load() {
+        // A real NN2 record: casino, six talkers, no hints.
+        let s = GameState::deserialize("NN2|4|41|1572735|cmfn|0|160|160|9|1,2,3,4,5,0|0").unwrap();
+        assert_eq!(s.scene, SceneId::Casino);
+        assert_eq!(s.score, 41);
+        assert_eq!(s.talks, [1, 2, 3, 4, 5, 0, 0, 0, 0]);
+        assert_eq!(s.hints, [0; HINT_SLOTS]);
+        // Re-saving upgrades it to NN3 and round-trips.
+        let text = s.serialize();
+        assert!(text.starts_with("NN3|4|41|"));
+        assert_eq!(GameState::deserialize(&text), Ok(s));
+        // An NN2 record can't carry nine talkers, nor an NN3 one six.
+        assert!(GameState::deserialize("NN2|4|41|0|cm|0|1|1|9|1,2,3,4,5,0,0,0,0|0").is_err());
+        assert!(GameState::deserialize("NN3|4|41|0|cm|0|1|1|9|1,2,3,4,5,0|0|0").is_err());
+    }
+
+    #[test]
+    fn flags_and_items_have_unique_bits_and_codes() {
+        let flags = [
+            Flag::SeenIntro,
+            Flag::Won,
+            Flag::Sang,
+            Flag::GotTicket,
+            Flag::DeeBriefed,
+            Flag::GotRod,
+            Flag::GotShrimp,
+            Flag::CaughtFlounder,
+            Flag::GotKey,
+            Flag::GotGown,
+            Flag::VisitedPier,
+            Flag::VisitedLaundromat,
+            Flag::VisitedMotel,
+            Flag::DryerOpen,
+            Flag::FerrisAway,
+        ];
+        let mut seen = 0u64;
+        for f in flags {
+            assert_eq!(seen & f as u64, 0, "{f:?} reuses a bit");
+            seen |= f as u64;
+        }
+        let mut codes: Vec<char> = Item::ALL.iter().map(|i| i.code()).collect();
+        codes.sort_unstable();
+        codes.dedup();
+        assert_eq!(codes.len(), Item::ALL.len());
     }
 
     #[test]
@@ -471,5 +634,9 @@ mod tests {
         assert!(GameState::deserialize("NN1|999|0|q|1|1|0|0|0").is_err());
         assert!(GameState::deserialize("NN2|9|0|0|q|0|1|1|0|0,0,0,0,0,0|0").is_err());
         assert!(GameState::deserialize("NN2|1|0|0|q|0|1|1|0|0,0|0").is_err());
+        assert!(GameState::deserialize("NN3|9|0|0|q|0|1|1|0|0,0,0,0,0,0,0,0,0|0|0").is_err());
+        assert!(GameState::deserialize("NN3|1|0|0|q|0|1|1|0|0,0,0,0,0,0,0,0,0|0|x").is_err());
+        assert!(GameState::deserialize("NN3|1|0|0|q|0|1|1|0|0,0,0,0,0,0,0,0,0|0|9").is_err());
+        assert!(GameState::deserialize("NN3|1|81|0|q|0|1|1|0|0,0,0,0,0,0,0,0,0|0|0").is_err());
     }
 }
