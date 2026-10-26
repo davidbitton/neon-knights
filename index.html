@@ -20,6 +20,19 @@
     }
     footer { font-size: 12px; margin-top: 6px; color: #555; }
   </style>
+  <script>
+    // Google Analytics (GA4). Only on the public Pages site, never in local runs or ?test mode.
+    if (location.hostname === 'davidbitton.github.io' && !location.search.includes('test')) {
+      var ga = document.createElement('script');
+      ga.async = true;
+      ga.src = 'https://www.googletagmanager.com/gtag/js?id=G-SRHPXEMN3B';
+      document.head.appendChild(ga);
+      window.dataLayer = window.dataLayer || [];
+      window.gtag = function () { dataLayer.push(arguments); };
+      gtag('js', new Date());
+      gtag('config', 'G-SRHPXEMN3B');
+    }
+  </script>
 </head>
 <body>
   <div id="screen">

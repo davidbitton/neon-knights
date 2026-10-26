@@ -225,3 +225,7 @@ scale). So text scales and crunches exactly like the art does.
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## Analytics
+
+The public site at davidbitton.github.io loads Google Analytics (GA4). The tag is skipped on any other host and in `?test` mode, so local runs and CI never send data.
