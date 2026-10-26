@@ -11,7 +11,7 @@ Repository: https://github.com/davidbitton/neon-knights
 A tiny browser adventure game written in plain Rust and compiled to
 WebAssembly. Chip Valentine, a cheesy guy in a powder-blue tuxedo, spends one
 night in Ocean Bluffs, a run-down beach town, trying to reach the mysterious
-Vonda on the casino roof. The game has six scenes:
+Vonda on the casino roof. The game has nine scenes:
 
 | Scene | Who's there |
 |---|---|
@@ -21,9 +21,20 @@ Vonda on the casino roof. The game has six scenes:
 | **Lucky Gull 24/7**, a convenience store | Brenda, a deeply bored clerk |
 | **The Golden Clam**, a casino lobby | Tiny, a doorman who is not tiny |
 | **The Crow's Nest**, a rooftop lounge | Vonda, a lounge singer in sequins |
+| **Gull Point Pier** (new in Milestone 4) | Percival, a pelican who patrols the deck |
+| **Suds & Duds**, a 24-hour laundromat (M4) | Dee, a curler-wearing guardian of the quarter-change |
+| **The Sandpiper Motor Court**, a motel lobby (M4) | Ferris, the night manager with a doomed bouffant |
 
 You get from scene to scene by walking through doorways or off the edge of
 the screen, or by typing things like `enter store` or `go to casino`.
+The map: the Boardwalk is the hub (Bar, Alley, Store, Casino). The Pier is
+east of the Boardwalk, and the Motel is east of the Pier. The Laundromat is
+west of the Alley.
+
+**Milestone 4, "The Second Night"**: after the Crow's Nest scene, Vonda
+needs a favor, and that sends Chip on an errand chain through the three
+new scenes. It adds 20 points (80 in all), two new deaths, six new items
+and a pelican that really does patrol the pier.
 
 > **Neon Knights is an original parody/homage** in the style of the late-1980s
 > Sierra-style parser adventures (16-color EGA graphics, a typed command line,
@@ -37,9 +48,14 @@ the screen, or by typing things like `enter store` or `go to casino`.
 * **Type commands** at the `>` prompt and press Enter: `look`, `look at bartender`,
   `take matchbook`, `talk to gus`, `use quarter on jukebox`, `give hot dog to mime`,
   `buy carnation`, `wear carnation`, `enter casino`, `inventory` / `i`, `score`,
-  `help`, `save`, `restore`, `restart`, `quit`.
+  `hint`, `verbs`, `help`, `save`, `restore`, `restart`, `quit`.
   Synonyms (`examine`, `x`, `l`, `get`, `grab`, `pick up` ...) and filler words
   (`the`, `at`, `to`, `with` ...) are understood.
+* **`hint`** gives progressive hints for whatever you should be doing in the
+  current area: each time you ask about the same puzzle it gets a little
+  less subtle (nudge, then a pointer, then nearly the answer). Your hint
+  progress is saved. **`verbs`** lists every verb the parser understands, and
+  `help` explains the interface.
 * **Arrow keys** walk (press the same arrow again to stop, old-school).
 * **Click** the floor to walk there. Chip finds a route around the
   furniture, and he won't wander through a doorway unless you clicked it. Click a thing to apply the current
@@ -56,13 +72,15 @@ the screen, or by typing things like `enter store` or `go to casino`.
   click, as browsers require.
 * The game saves to one `localStorage` slot (`neon-knights.save.v1`). The save
   stores the scene, Chip's position, score, inventory, cash, every puzzle
-  flag and conversation progress. It's a versioned text record (`NN2|...`).
-  Milestone 1 saves (`NN1|...`, always in the bar) still load. So do saves
+  flag, conversation progress and hint progress. It's a versioned text
+  record (`NN3|...`). Older saves (`NN2|...` from Milestones 2 and 3, and
+  Milestone 1's `NN1|...`, always in the bar) still load, and saving again
+  upgrades them to `NN3`. So do saves
   made under the old working title "Neon Nights" (`neon-nights.save.v1`),
   which are migrated to the new key on restore.
 
-There are **60 points**. Every point can be earned, and each one only once.
-There are **five ways to die**, and each gets its own tombstone and epitaph.
+There are **80 points**. Every point can be earned, and each one only once.
+There are **seven ways to die**, and each gets its own tombstone and epitaph.
 Stuck? [WALKTHROUGH.md](WALKTHROUGH.md) has the full solution (spoilers!).
 
 ## Continuous integration and deployment
@@ -106,23 +124,24 @@ cd dist && python3 -m http.server 8080   # then open http://localhost:8080
 ## Testing
 
 **Native tests** (`cargo test`) cover the engine, the parser, every scene's
-rules, a full walkthrough to 60/60, every death, save compatibility,
+rules, a full walkthrough to 80/80, every death, save compatibility,
 path-finding, the font and the tunes.
 
 **Browser UI tests** (`tests/ui/`, pytest + Playwright, Chromium) drive the
 real game in a headless browser:
 
 * *Functional* tests (`test_game.py`) use real keyboard and mouse input:
-  - a full mouse-and-keyboard playthrough to 60/60
+  - a full mouse-and-keyboard playthrough to 80/80
+  - the new scenes, each puzzle step, the `hint` command and the patrolling pelican
   - every death, plus the tombstone's Restore button and N key
-  - save/restore, including migration of the legacy save key
+  - save/restore, including `NN3` round-trips, old `NN2` saves and migration of the legacy save key
   - the ending's buttons and keys
   - audio: the AudioContext only after a user gesture, and the beeps for
     each sound effect
   - mute (M key and `sound on`/`sound off`) persisting across reloads
 * *Visual regression* tests (`test_visual.py`) compare key frames: the
-  title, all six scenes, a message box, a parser error, a death screen and
-  the ending.
+  title, all nine scenes, a message box, a parser error, three death
+  screens and the ending.
 
   They compare the game's own 320x200 framebuffer, read out as palette
   indices, against PNG baselines in `tests/visual/baseline/`. They don't use
